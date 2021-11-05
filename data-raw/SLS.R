@@ -10,6 +10,13 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
                         surveyName = "SLS",
                         extension = ".zip") {
   
+  # # Does this file already exists? If so, do not download again. Useful for running
+  # # this command multiple times during a session. This is because the FTP server
+  # # will limit connections to it if it is made too often
+  if (file.exists(file.path(tempdir(), paste0("SLS", ".zip")))) {
+    return("File has already been created. Not downloading again.")
+  }
+  
   # Fetch the SLS name from the ftp website
   # Create websession
   startingSession <- xml2::read_html(x = url)
@@ -19,15 +26,14 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
   links <- rvest::html_attr(nodes, "href")
   # Subset only the relevant link for the survey of interest
   surveyLink <- stringr::str_subset(links, paste0(surveyName, "*.+", extension))
-  # <<- is to pull this into the parent environment to be used by the other functions
-  surveyName <<- surveyName
+  surveyName <- surveyName
   fileName <- sub(".*/", "", surveyLink)
   # Doing it this way to hopefully it make more robust to weird changes in the future
   # for eg, 20mm is not just 20mm.zip, but 20mm_New.zip
   
   # Download the SLS.zip file from the ftp website
   # Download to tempfolder
-  tempFile <<- file.path(tempdir(), fileName)
+  tempFile <- file.path(tempdir(), fileName)
   # Sets up the URL path here
   dbLink <- paste0(url, "/", fileName)
   
@@ -40,6 +46,7 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
 # Function to start reading data from Access directly
 readSLSAccess <- function(file = tempFile,
                           exdir = tempdir(),
+                          surveyName = "SLS",
                           returnDF = F) {
 
   cat("\n")
@@ -48,9 +55,10 @@ readSLSAccess <- function(file = tempFile,
   # In order to use this correctly, you need to have the 32-bit version of R installed
   # This function is used with system() below to create an RDA file 
   # required by the rest of the script
+  tempFile <- list.files(tempdir())[grep("*.+zip", list.files(tempdir()))]
   
   # Extracting the downloaded file from downloadSLS()
-  localDbFile <- unzip(zipfile = tempFile, exdir = exdir)
+  localDbFile <- unzip(zipfile = file.path(exdir, tempFile), exdir = exdir)
   
   # Driver and path required to connect from RStudio to Access
   dbString <- paste0("Driver={Microsoft Access Driver (*.mdb, *.accdb)};",
@@ -83,7 +91,6 @@ readSLSAccess <- function(file = tempFile,
   
   # For instances where you do not want to write the rda and want to work 
   # entirely in this environment, returnDF will be used
-  return <- match.arg(return)
   
   if (returnDF) {
     
@@ -92,6 +99,7 @@ readSLSAccess <- function(file = tempFile,
     
   } else {
     # If not returning the df, will return BOTH the csv files AND RDA file
+    
     cat("Exporting csv flat files \n")
     
     writeFiles <- sapply(seq_along(SLSTables), function(i) {
@@ -114,15 +122,15 @@ readSLSAccess <- function(file = tempFile,
            paste0(length(errors), " out of ", length(df$tableNames), " tables \n"),
            paste0(errors, "\n"), call. = F)
     } else {
-      cat("All tables export successfully \n")
+      cat("All tables exported successfully \n")
     }
-    
-    # Now returning the rda
-    readr::write_rds(SLSTables, "SLSAccessTables.rda", "xz", compression = 9L)
-    
     cat("Exporting rda file \n")
     
-    if (file.exists("SLSAccessTables.rda")) cat("RDA file successfully created \n")
+    # Now returning the rda
+    saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rda"),
+            compress = T)
+    
+    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rda"))) cat("RDA file created successfully  \n")
     else (stop("RDA file was NOT created, something failed!"))
   }
 }
