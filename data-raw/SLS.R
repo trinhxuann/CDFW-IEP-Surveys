@@ -104,6 +104,8 @@ readSLSAccess <- function(file = tempFile,
     
     writeFiles <- sapply(seq_along(SLSTables), function(i) {
       
+      if (!file.path("data-raw")) stop("A `data-raw` folder was not detected in the working directory; please create this folder.")
+      
       filePath <- file.path("data-raw", surveyName, paste0(names(SLSTables[i]), ".csv"))
       
       write.csv(SLSTables[[i]],

@@ -24,6 +24,8 @@ pullAccessDF <- function(file = c("SLS.R")) {
     
     filePath <- file.path(getwd(), "data-raw", file)
     
+    if (grepl("\\s", filePath)) stop("The filepath has a space somewhere along the path. Please remove the space.")
+    
     terminalOutput <- system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", filePath), 
                              wait = T)
   }
