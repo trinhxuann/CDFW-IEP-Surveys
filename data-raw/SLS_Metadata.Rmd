@@ -1,0 +1,200 @@
+---
+title: "SLS Metadata"
+author: "CDFW IEP"
+date: "Last updated on `r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document
+---
+
+```{r setup, include=FALSE}
+# Loading libraries
+
+# install.packages("kableExtra")
+library(kableExtra)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+
+options(scipen = 999, width = 80)
+# theme_set(theme_classic(base_size = 20) +
+#             theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
+knitr::opts_chunk$set(dpi=320, width = 150, fig.width=18, fig.height=14, warning=FALSE, message=F, dev.args = list(type = "cairo-png", pointsize = 13), echo = F)
+
+makeKable <- function(df, caption = NULL, width = "100%", height = NULL) {
+  
+  table <- kbl(df, caption = caption) %>%
+  kable_classic(full_width = T, html_font = "Cambria", "striped")
+  
+  if (!is.null(height)) {
+    height <- paste0(height, "px")
+    
+    table <- scroll_box(table, width = width, height = height)
+  }
+  table
+}
+```
+
+##### **Name of study:** Smelt Larval Survey (SLS)
+
+##### **Program element:** 096
+
+##### **Agency:** Department of Fish and Wildlife, Bay Delta Region (R3)
+
+Address: 2109 Arch Airport Rd Suite 100, Stockton, CA 95206
+
+Phone: (209) 234-3420
+
+##### **Program manager:** Lauren Damon, [Lauren.Damon@Wildlife.ca.gov](mailto:Lauren.Damon@Wildlife.ca.gov)
+
+##### **Project lead:** Adam Chorazyczewski, [Adam.Chorazyczewski@Wildlife.ca.gov](mailto:Adam.Chorazyczewski@Wildlife.ca.gov)
+                    
+##### **Purpose/Objective:** Monitor and provide information on larval longfin smelt abundance and distribution in the upper San Francisco Estuary. Conduct larval fish surveys to determine the timing, distribution, and abundance of longfin smelt larvae. Help estimate larval longfin smelt fish losses and determine the magnitude of entrainment of larval longfin smelt at CVP and SWP intakes. 
+
+##### **Data collected:** temperature, electro-conductivity, water transparency, turbidity, water volume, tidal stage, and identification and lengths of fishes
+
+##### **Geographic range of work:** Lower Napa River to the city of Napa, eastern Carquinez Strait upstream throughout Suisun Bay; San Joaquin River to Stockton, Old and Middle Rivers in the south Delta to West Canal; Sacramento River to Rio Vista; Cache Slough from Rio Vista to Shag Slough ; 1 station at the mouth of the Sacramento Deep-water Ship Channel. 
+
+```{r, overall map, echo = F, results='asis', fig.cap="Figure 1. Map of all SLS sampling stations. Each blue point represents the location of a station by the survey. The map is interactive. Hover over the markers to show the station label."}
+# I'm going to just use the LTMRdata package here for now for SLS; depending on Sam's answer on if I can just piggy back off of his package or not, I will change this later
+
+specialStations <- data.frame(Station = as.character(c(716, 809, 812, 815, 901, 902, 906, 910, 912, 914, 915, 918, 919)),
+                              Status = c("Barker ITP Station", rep("SWP ITP Criteria Stations", 12)))
+
+# To color the stations on the map accordingly
+pal <- colorFactor("viridis", domain = c(specialStations$Status, "SLS Stations"))
+
+leaflet(LTMRdata::SLS %>% 
+            distinct(Station, Latitude, Longitude) %>% 
+            left_join(specialStations, by = "Station") %>% 
+            mutate(Status = factor(ifelse(is.na(Status), "SLS Stations", Status),
+                                   levels = c("SLS Stations", "Barker ITP Station", "SWP ITP Criteria Stations"))),
+        width = "100%",
+        height = "500") %>%
+    addProviderTiles(providers$CartoDB.Positron) %>%
+    addCircleMarkers(~Longitude, ~Latitude,
+                     label = ~as.character(Station),
+                     color = ~pal(Status),
+                     radius = 6,
+                     stroke = F, fillOpacity = 0.8,
+                     labelOptions = labelOptions(noHide = T,
+                                                 offset = c(18,0),
+                                                 textOnly = T,
+                                                 textsize = "12px",
+                                                 direction = "center")) %>% 
+  addLegend(pal = pal, values = ~Status, opacity = 1)
+```
+
+##### **Number of sites:** `r length(unique(LTMRdata::SLS$Station))` stations. See the [metadata section](#metadata) for additional metadata of each station.
+
+##### **Data range:** `r min(LTMRdata::SLS$Date)` to `r max(LTMRdata::SLS$Date)`<br>
+
+##### **Sampling frequency**: sampling begins in December and is conducted *every other week*. Sampling ends:
+
+1. early spring (March)
+2. when catch efficiency decreases
+3. when longfin smelt are no longer found in the central or south Delta (Stations? Label on) in high densities in danger of being entrained at the Central Valley Project (CVP) and State Water Project (SWP)
+
+##### **Field sampling:**
+
+The SLS uses a cone shaped net 3.35 meters ($m$) in length with a mouth area of 0.37 $m^2$. A single tow is conducted at each of 44 sampling stations. The net itself is composed of 505 $\mu m$ NitexR and is mounted on a fixed metal tube frame with skids. The
+mesh was altered prior to the 2014 season to 500 $\mu m$ NitexR, when new nets were purchased and the original mesh was no longer available (see 2014 changes below). These ~~net~~ new nets were incorporated as old nets became unusable. The net is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar and then the jar is removed and its contents preserved in 10% formalin for identification in the lab. A General Oceanics flowmeter is mounted across the net’s mouth to estimate the water volume filtered.
+
+##### **Laboratory analysis:**
+
+The distinctively labeled sample jars are taken to the laboratory at the California Department of Fish and Wildlife’s Bay Delta Region, Stockton. For fish samples, the complete contents are sorted and any larval fish present are identified and counted. All fish are identified to species or lowest possible taxon. **For plus counts**, the first 50 individuals from each tow per species are randomly selected and measured (FL) to the nearest millimeter *and the remaining individuals are enumerated*. All longfin smelt are measured regardless of catch size.
+
+##### **Relative density analysis:**
+
+The mean number of fish per volume water sampled (standardized to 1000 $m^3$) is calculated using the following two equations:
+
+<center>
+$V_{t} = A * K * D_{t}$
+</center>
+
+*Where:*
+
+$V_{t}$ = volume of water ($m^{3}$) filtered through the net per tow $t$
+
+$A$ = mouth opening of the net ($m^{2}$)
+
+$K$ = calibration factor for the flow meter, 0.026873027 since 2015
+
+$D_{t}$ = difference in flow meter counts from start to finish of tow $t$
+
+<center>
+$n_{t} = F_{t}/V_{t} * 1000 m^{3}$
+</center>
+
+*Where:*
+
+$n_{t}$ = number of fish per 1000 $m^{3}$ per tow $t$
+
+$F_{t}$ = fish caught per tow
+
+$V_{t}$ = volume of water filtered through the net $m^{3}$ per tow
+
+<br>
+
+##### **Changes over time and important notes:**
+The years listed below are water years, which begins three months before the new calendar year on October 1.
+
+2009 – Project start. Five biweekly delta–wide (35 stations) surveys conducted from early January to early March
+
+2010 – Temporal extension of sampling; 6 biweekly delta–wide (35 stations) surveys conducted from early January to late March. Implementation of the use of a Hach Model # 2100P Turbidimeter as Standard Operating Procedure to record turbidity in NTU’s. Recorded Latitude and Longitude on datasheets, but not entered into database.
+
+2011 – Latitude and Longitude recorded in database. Yolk sac and oil globule presence noted in data.
+
+2012 – Sixth survey added.
+
+2013 – N/A
+
+2014 – Spatial extension of sampling into Napa River as part of an agreement with the State Water Contractors (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349). Database was revised by Tuongvan Nguyen at ITB as part of the Bay Delta Application Hosting to move public facing data onto secure Tier 3 server. Data is now entered into SLS_Local.mdb, housed in SLS_Query.mdb (local server), and appended to the tier 3 server before uploading to webpage. New nets were incorpoated (manufactured on 5/10/2013 by Lodi Tent and Awning) with a different Nitex Mesh purchased from Sefar (500 micron, 47% open space. Part # 06–500/47).
+
+2015 – Factory k value (0.026873027) used in MeterCorrections table. Flowmeters were not calibrated at UC Davis due to machinery malfunction. Facility is awaiting repair.
+
+2016 – Continued using factory k value for MeterCorrections. Flowmeters were sent to General Oceanic for refurbishing prior to field season.
+
+2017 – Continued using factory k value for MeterCorrections. Flowmeters were sent to General Oceanic for refurbishing prior to field season.
+
+2018 – Continued using factory k value for MeterCorrections.
+
+2019 – Continued using factory k value for MeterCorrections. Ceased sampling stations within the Napa River (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349). On 9/10/2019 two tables were removed from the local copy of the database: Zooplankton and Zoo Catch. It appears these tables were appended to the database from the 20–mm database back in 2013. More information and a copy of the tables can be found on the local server: `U:\NativeFish\SmeltData\Zooplankton\SLS_Erroneous_ZooTables.xlsx`
+
+2021 – Two additional surveys added in December. These surveys are limited in geographic range to the south and central delta.
+
+2022- The two additional surveys in December are expanded to encompass all stations. Napa River stations (340, 342, 343, 344, 345, 346, 347, 348, and 349) have been added back to the surveys, including the supplemental December surveys. 
+
+##### **Station metadata** {#metadata}
+
+```{r, station metadata}
+LTMRdata::SLS %>% group_by(Station, Latitude, Longitude) %>%
+    slice(1, n()) %>% select(Date, Station, Latitude, Longitude) %>%
+    mutate(start = c("StartDate", "EndDate")) %>%
+    ungroup() %>%
+    tidyr::pivot_wider(names_from = "start", values_from = "Date") %>%
+    # Going to just say that anything taken 30 days since the last date in the dataset == ongoing survey
+    mutate(EndDate = if_else(EndDate >= max(LTMRdata::SLS$Date) - 30, "Ongoing", as.character(EndDate))) %>%
+    makeKable(caption = paste0("Table 1. List of stations sampled by SLS since inception. ", dQuote("StartDate"), " indicates the date when sampling began for a station; ", dQuote("EndDate"), " indicates the date when sampling ended at a station, with ", dQuote("Ongoing"), " represtation stations that are still activly sampled by the survey."))
+```
+
+<br><br>
+
+```{r, station figure, fig.cap="Figure 2. The number of times a station was surveyed per water year is shown in various colors. No color indicates that a station was not sampled for that water year. The Napa River stations, 340, 342, 343, 344, 345, 346, 347, 348, 349, were ran for only five water years, from 2014 to 2018."}
+LTMRdata::SLS %>%
+  distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)),
+           Station, Survey) %>%
+  group_by(waterYear, Station, Survey) %>%
+  count() %>%
+  group_by(waterYear, Station) %>%
+  mutate(numSurvey = factor(sum(n))) %>%
+  ggplot(aes(waterYear, Station, fill = numSurvey)) +
+  geom_tile(color = "grey50") +
+  scale_y_discrete(limits = rev) +
+  scale_fill_viridis_d() +
+  labs(title = "Number of surveys per station per water year",
+       fill = "Number of surveys",
+       x = "Water Year") +
+  theme_classic(base_size = 24) +
+  theme(legend.position = "bottom")
+```
+
