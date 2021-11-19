@@ -52,9 +52,9 @@ Phone: (209) 234-3420
 
 ##### **Data collected:** temperature, electro-conductivity, water transparency, turbidity, water volume, tidal stage, and identification and lengths of fishes
 
-##### **Geographic range of work:** Lower Napa River to the city of Napa, eastern Carquinez Strait upstream throughout Suisun Bay; San Joaquin River to Stockton, Old and Middle Rivers in the south Delta to West Canal; Sacramento River to Rio Vista; Cache Slough from Rio Vista to Shag Slough ; 1 station at the mouth of the Sacramento Deep-water Ship Channel. 
+##### **Geographic range of work:** Lower Napa River to the city of Napa, eastern Carquinez Strait upstream throughout Suisun Bay; San Joaquin River to Stockton, Old and Middle Rivers in the south Delta to West Canal; Sacramento River to Rio Vista; Cache Slough from Rio Vista to Shag Slough; 1 station at the mouth of the Sacramento Deep-water Ship Channel. 
 
-```{r, overall map, echo = F, results='asis', fig.cap="Figure 1. Map of all SLS sampling stations. Each blue point represents the location of a station by the survey. The map is interactive. Hover over the markers to show the station label."}
+```{r, overall map, echo = F, results='asis', fig.cap="Figure 1. Map of all SLS sampling stations. Each point represents the location of a station by the SLS survey. Stations that are specifically called out by the 2020 SWP ITP Conditions of Approvals are uniquely colored."}
 # I'm going to just use the LTMRdata package here for now for SLS; depending on Sam's answer on if I can just piggy back off of his package or not, I will change this later
 
 specialStations <- data.frame(Station = as.character(c(716, 809, 812, 815, 901, 902, 906, 910, 912, 914, 915, 918, 919)),
@@ -92,16 +92,16 @@ leaflet(LTMRdata::SLS %>%
 
 1. early spring (March)
 2. when catch efficiency decreases
-3. when longfin smelt are no longer found in the central or south Delta (Stations? Label on) in high densities in danger of being entrained at the Central Valley Project (CVP) and State Water Project (SWP)
+3. when longfin smelt are no longer found in the central or south Delta in high densities in danger of being entrained at the Central Valley Project (CVP) and State Water Project (SWP)
 
 ##### **Field sampling:**
 
 The SLS uses a cone shaped net 3.35 meters ($m$) in length with a mouth area of 0.37 $m^2$. A single tow is conducted at each of 44 sampling stations. The net itself is composed of 505 $\mu m$ NitexR and is mounted on a fixed metal tube frame with skids. The
-mesh was altered prior to the 2014 season to 500 $\mu m$ NitexR, when new nets were purchased and the original mesh was no longer available (see 2014 changes below). These ~~net~~ new nets were incorporated as old nets became unusable. The net is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar and then the jar is removed and its contents preserved in 10% formalin for identification in the lab. A General Oceanics flowmeter is mounted across the net’s mouth to estimate the water volume filtered.
+mesh was altered prior to the 2014 season to 500 $\mu m$ NitexR, when new nets were purchased and the original mesh was no longer available (see 2014 changes below). These new nets were incorporated as old nets became unusable. The net is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar and then the jar is removed and its contents preserved in 10% formalin for identification in the lab. A General Oceanics flowmeter is mounted across the net’s mouth to estimate the water volume filtered.
 
 ##### **Laboratory analysis:**
 
-The distinctively labeled sample jars are taken to the laboratory at the California Department of Fish and Wildlife’s Bay Delta Region, Stockton. For fish samples, the complete contents are sorted and any larval fish present are identified and counted. All fish are identified to species or lowest possible taxon. **For plus counts**, the first 50 individuals from each tow per species are randomly selected and measured (FL) to the nearest millimeter *and the remaining individuals are enumerated*. All longfin smelt are measured regardless of catch size.
+The distinctively labeled sample jars are taken to the laboratory at the California Department of Fish and Wildlife’s Bay Delta Region, Stockton. For fish samples, the complete contents are sorted and any larval fish present are identified and counted. All fish are identified to species or lowest possible taxon. For plus counts, the first 50 individuals from each tow per species are randomly selected and measured (FL) to the nearest millimeter and the remaining individuals are enumerated. All longfin smelt are measured regardless of catch size.
 
 ##### **Relative density analysis:**
 
@@ -197,4 +197,3 @@ LTMRdata::SLS %>%
   theme_classic(base_size = 24) +
   theme(legend.position = "bottom")
 ```
-
