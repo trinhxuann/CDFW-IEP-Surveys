@@ -104,7 +104,7 @@ readSLSAccess <- function(file = tempFile,
     
     writeFiles <- sapply(seq_along(SLSTables), function(i) {
       
-      if (!file.path("data-raw")) stop("A `data-raw` folder was not detected in the working directory; please create this folder.")
+      if (!file.exists("data-raw")) stop("A `data-raw` folder was not detected in the working directory; please create this folder.")
       
       filePath <- file.path("data-raw", surveyName, paste0(names(SLSTables[i]), ".csv"))
       
@@ -127,9 +127,9 @@ readSLSAccess <- function(file = tempFile,
       cat("All tables exported successfully \n")
     }
     cat("Exporting rda file \n")
-    
+    browser()
     # Now returning the rda
-    saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rda"),
+    saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rds"),
             compress = T)
     
     if (file.exists(file.path("data-raw", surveyName, "SLSTables.rda"))) cat("RDA file created successfully  \n")
