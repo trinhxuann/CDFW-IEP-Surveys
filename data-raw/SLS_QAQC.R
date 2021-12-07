@@ -7,6 +7,7 @@
 library(dplyr)
 library(lubridate)
 library(stringr)
+library(leaflet)
 
 # Reading in the base tables ----------------------------------------------
 # This script should be ran after creating the databases script. I will assume
@@ -20,11 +21,18 @@ outliers <- list()
 
 # When this analysis is up to date, will likely only want to see data from
 # the current season. Currently, the season for SLS spans from Dec-Mar of each WY
+# Also adding a second requirement that the latest data entry is later than Dec 1 of current year
 
-yearOfInterest <- year(today()) + (month(today()) > 11)
+yearOfInterest <- year(today()) + (month(today()) > 11 & max(data$`Water Info`$Date) > as.Date(paste0(year(today()), "-12-01")))
 
 # Now moving on to checking outliers 
 # The calculations below are those that were requested by Adam on 11-9-2021
+
+# The "NAFlag" column will flag values with NAs;
+# However, these NAs will be ignored when calculating mean and sd, as is default behavior in Access
+# NAFlag will be present across all "queries"
+# Outlier column will also be present across all "queries"
+
 # Cable outliers ----------------------------------------------------------
 
 # Equivalent to "Edit - Cable Out (outliers)
@@ -38,23 +46,34 @@ yearOfInterest <- year(today()) + (month(today()) > 11)
 # return as an outlier
 
 outliers$CableDepth <- full_join(data$`Water Info`, data$`Tow Info`, 
-                        by = c("Date", "Station")) %>% 
+                                 by = c("Date", "Station")) %>% 
   transmute(Date = as.Date(Date),
             Survey, Station, Tow, BottomDepth, CableOut,
-            Year = year(Date)) %>% 
+            Year = year(Date),
+            SeasonYear = year(Date) + (month(Date) > 11)) %>% 
   arrange(Date) %>% 
-  # Why are the ranges overlapping...? Bythemetry not always consistent that may need to be accounted for; 
+  # Ranges overlap due to bythemetry not always consistent that may need to be accounted for; 
   # boat operators should try and follow bypthemetry
-  filter(BottomDepth > 39 & !CableOut %in% c(140, 155) |
-           BottomDepth > 34 & BottomDepth < 40 & !CableOut %in% c(140, 125, 155) |
-           BottomDepth > 29 & BottomDepth < 35 & !CableOut %in% c(140, 125, 110) |
-           BottomDepth > 24 & BottomDepth < 30 & !CableOut %in% c(125, 110, 90) |
-           BottomDepth > 19 & BottomDepth < 25 & !CableOut %in% c(110, 90, 75) |
-           BottomDepth > 14 & BottomDepth < 20 & !CableOut %in% c(90, 75, 60) |
-           BottomDepth > 9 & BottomDepth < 15 & !CableOut %in% c(75, 60, 45) |
-           BottomDepth > 4 & BottomDepth < 10 & !CableOut %in% c(60, 45))
+  mutate(Outlier = ifelse(BottomDepth > 39 & !CableOut %in% c(140, 155) |
+                               BottomDepth > 34 & BottomDepth < 40 & !CableOut %in% c(140, 125, 155) |
+                               BottomDepth > 29 & BottomDepth < 35 & !CableOut %in% c(140, 125, 110) |
+                               BottomDepth > 24 & BottomDepth < 30 & !CableOut %in% c(125, 110, 90) |
+                               BottomDepth > 19 & BottomDepth < 25 & !CableOut %in% c(110, 90, 75) |
+                               BottomDepth > 14 & BottomDepth < 20 & !CableOut %in% c(90, 75, 60) |
+                               BottomDepth > 9 & BottomDepth < 15 & !CableOut %in% c(75, 60, 45) |
+                               BottomDepth > 4 & BottomDepth < 10 & !CableOut %in% c(60, 45), 
+                          T, F),
+         # If Tow, BottomDepth, or CableOut columns are missing row values, flag them
+         NAFlag = ifelse(is.na(Tow) | is.na(BottomDepth) | is.na(CableOut),
+                         T, F)) %>% 
+  filter(Outlier == T | NAFlag == T,
+         # Only care about outliers this season
+         SeasonYear %in% yearOfInterest) %>% 
+  arrange(Outlier, Date, Station)
 # Join to the water info table is needed to get "survey"
 # Checked 11-24-21 by TN that this matches the DB query, by summing each column of resulting DF
+# 12-6-21; changing this to Outlier column format == still same output as 11-24-21 BEFORE adding in values with
+# NAFlag; Adding in the NAFlag column will mean the final table will have more flagged values than on 11-24-21 (thus on Access DB)
 
 # Meter readings ----------------------------------------------------------
 
@@ -66,12 +85,18 @@ outliers$MeterReading <- full_join(data$`Water Info`, data$`Tow Info`,
                             by = c("Date", "Station")) %>% 
   select(Date, Survey, Station, Tow, Duration, 
          CBMeterCheck, NetMeterCheck, contains("Comments")) %>% 
-  mutate(Date = as.Date(Date)) %>% 
-  filter((Duration %in% 2.5 & (NetMeterCheck < 2500 | NetMeterCheck > 12000)) |
-           (Duration %in% 5 & (NetMeterCheck < 5000 | NetMeterCheck > 15000)) |
-           (Duration %in% 10 & (NetMeterCheck < 10000 | NetMeterCheck > 30000))) %>% 
-  arrange(Date)
+  mutate(Date = as.Date(Date),
+         SeasonYear = year(Date) + (month(Date) > 11),
+         Outlier = ifelse((Duration %in% 2.5 & (NetMeterCheck < 2500 | NetMeterCheck > 12000)) |
+                            (Duration %in% 5 & (NetMeterCheck < 5000 | NetMeterCheck > 15000)) |
+                            (Duration %in% 10 & (NetMeterCheck < 10000 | NetMeterCheck > 30000)),
+                          T, F),
+         NAFlag = ifelse(is.na(Duration) | is.na(NetMeterCheck), T, F)) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
+  arrange(Outlier, Date, Station)
 # Checked 11-24-21 by TN that this matches the DB query, small enough to check that all is equal
+# Checked 12-06-21 by TN that addition of Outlier and NAFlag does not break code
 
 # Equivalent to "Edit - Net Meter Serial"
 # plot out flow meter checks, by diff flow meter serials; to determine when a certain flow meter failed during a season
@@ -86,6 +111,20 @@ outliers$NetMeterSerial <- full_join(data$`Water Info`, data$`Tow Info`,
   count(name = "CountOfNetMeterSerial")
 # I believe this script is used for other analyses by Native Fishes. Will keep for now
 # Checked 11-24-21 by TN that this matches the DB query, small enough to check that all is equal
+# # From conversations with Adam, these meter values are used to potentially plot out when a meter
+# # goes bad in the season. The following code attempts to plot that
+# full_join(data$`Water Info`, data$`Tow Info`,
+#           by = c("Date", "Station")) %>% 
+#   transmute(Date, 
+#             Year = year(Date), 
+#             Survey, 
+#             NetMeterSerial,
+#             NetMeterCheck) %>% 
+#   filter(Year %in% 2021) %>% 
+#   ggplot(aes(Date, NetMeterCheck)) +
+#   geom_point() +
+#   facet_wrap(~NetMeterSerial, nrow = 3)
+# # Don't really see how this would be used; likely interpreted Adam wrong.
 
 # Equivalent to "Edit - Tow duration (outliers)"
 
@@ -94,18 +133,21 @@ outliers$NetMeterSerial <- full_join(data$`Water Info`, data$`Tow Info`,
 
 outliers$TowDuration <- full_join(data$`Water Info`, data$`Tow Info`,
                          by = c("Date", "Station")) %>% 
-  filter(!Duration %in% c(2.5, 5, 10)) %>% 
-  mutate(Date = as.Date(Date)) %>% 
-  select(Date, Station, Tow, Duration, contains("Comments"))
+  mutate(Date = as.Date(Date),
+         SeasonYear = year(Date) + (month(Date) > 11),
+         Outlier = ifelse(!Duration %in% c(2.5, 5, 10),
+                          T, F),
+         NAFlag = ifelse(is.na(Duration),
+                         T, F)) %>% 
+  select(Date, SeasonYear, Station, Tow, Duration, contains("Comments"), Outlier, NAFlag) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest)
 # water info is used here to grab the comment section from the water info table
 # Checked 11-24-21 by TN that this matches the DB query, both queries returned 0 rows
 
 # Physical parameters -----------------------------------------------------
 
 # Equivalent to Edit – Bottom Depth III
-
-# After conversations with Adam, will include a column to flag values with NAs, "NAFlag";
-# However, these NAs will be ignored when calculating mean and sd, as is default behavior in Access
 
 # What the script does: IMPORTANT: this is applicable to ALL the physical predictors below, so
 # BottomDepth, BottomDepthMonth, Temp, TempMonth, TopEC, TopECMonth, BottomEC, BottomECMonth,
@@ -119,288 +161,294 @@ outliers$TowDuration <- full_join(data$`Water Info`, data$`Tow Info`,
 
 outliers$BottomDepth <- data$`Tow Info` %>% 
   group_by(Station) %>% 
-  mutate(# This is part 1 of the query
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
          meanBottomDepth = mean(BottomDepth, na.rm = T),
          sd2down = meanBottomDepth - 2 * sd(BottomDepth, na.rm = T),
          sd2up = meanBottomDepth + 2 * sd(BottomDepth, na.rm = T),
          # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
          # This is part 2 of the query
-         # Why this 12-31 cut off...? Ask Adam ####
+         Outlier = ifelse((BottomDepth < sd2down | BottomDepth > sd2up), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
+         NAFlag = ifelse(is.na(BottomDepth), T, F)) %>% 
+  arrange(Date) %>% 
+  # This is part 3 of the query
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(Date, SeasonYear, Station, BottomDepth, meanBottomDepth, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  mutate(Date = as.Date(Date)) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
+  arrange(NAFlag, Outlier, Date)
+# Checked 11-24-21 by TN that this matches the DB query, summation of the numeric columns equal
+
+# BottomDepthMonth
+
+outliers$BottomDepthMonth <- data$`Tow Info` %>% 
+  group_by(Station, Month = month(Date)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanBottomDepth = mean(BottomDepth, na.rm = T),
+         sd2down = meanBottomDepth - 2 * sd(BottomDepth, na.rm = T),
+         sd2up = meanBottomDepth + 2 * sd(BottomDepth, na.rm = T),
+         # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
+         # This is part 2 of the query
          Outlier = ifelse((BottomDepth < sd2down | BottomDepth > sd2up), T, F),
          # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(BottomDepth), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
   # Note that the Comments column from the table is preserved here; this is useful for the NAFlag column
-  select(Date, Station, BottomDepth, meanBottomDepth, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, SeasonYear, Month, Station, BottomDepth, meanBottomDepth, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
-# Checked 11-24-21 by TN that this matches the DB query, summation of the numeric columns equal
-
-# BottomDepthMonth
-# Does this make sense to do depth by month though? Likely, since flow in the system is also seasonal?
-#### Ask Adam ####
-
-outliers$BottomDepthMonth <- data$`Tow Info` %>% 
-  group_by(Station, Month = month(Date)) %>% 
-  mutate(# This is part 1 of the query
-    meanBottomDepth = mean(BottomDepth, na.rm = T),
-    sd2down = meanBottomDepth - 2 * sd(BottomDepth, na.rm = T),
-    sd2up = meanBottomDepth + 2 * sd(BottomDepth, na.rm = T),
-    # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((BottomDepth < sd2down | BottomDepth > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    # This is new to the code; will create a column that flags NAs and those will also be returned
-    NAFlag = ifelse(is.na(BottomDepth), T, F)) %>% 
-  arrange(Date) %>% 
-  # This is part 3 of the query
-  # Note that the Comments column from the table is preserved here; this is useful for the NAFlag column
-  select(Date, Month, Station, BottomDepth, meanBottomDepth, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
-  mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
-  arrange(NAFlag, Outlier, Date)
-
-##### Important: GO BACK AND REMOVE 2012-12-31 date filters for these
 
 # Edit – Temp III
 outliers$Temp <- data$`Water Info` %>% 
   group_by(Station) %>% 
-  mutate(# This is part 1 of the query
-    meanTemp = mean(Temp, na.rm = T),
-    sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-    sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Temp < sd2down | Temp > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Temp), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanTemp = mean(Temp, na.rm = T),
+         sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
+         sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
+         NAFlag = ifelse(is.na(Temp), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # TempMonth
 outliers$TempMonth <- data$`Water Info` %>% 
   group_by(Station, Month = month(Date)) %>% 
-  mutate(# This is part 1 of the query
-    meanTemp = mean(Temp, na.rm = T),
-    sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-    sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Temp < sd2down | Temp > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Temp), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanTemp = mean(Temp, na.rm = T),
+         sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
+         sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
+         NAFlag = ifelse(is.na(Temp), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Month, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # Edit – Top EC III
 outliers$TopEC <- data$`Water Info` %>% 
   group_by(Station) %>% 
-  mutate(# This is part 1 of the query
-    meanTopEC = mean(TopEC, na.rm = T),
-    sd2down = meanTopEC - 2 * sd(TopEC, na.rm = T),
-    sd2up = meanTopEC + 2 * sd(TopEC, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((TopEC < sd2down | TopEC > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(TopEC), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanTopEC = mean(TopEC, na.rm = T),
+         sd2down = meanTopEC - 2 * sd(TopEC, na.rm = T),
+         sd2up = meanTopEC + 2 * sd(TopEC, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((TopEC < sd2down | TopEC > sd2up), T, F),
+         NAFlag = ifelse(is.na(TopEC), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Station, TopEC, meanTopEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, TopEC, meanTopEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # TopECMonth
 outliers$TopECMonth <- data$`Water Info` %>% 
   group_by(Station, Month = month(Date)) %>% 
-  mutate(# This is part 1 of the query
-    meanTopEC = mean(TopEC, na.rm = T),
-    sd2down = meanTopEC - 2 * sd(TopEC, na.rm = T),
-    sd2up = meanTopEC + 2 * sd(TopEC, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((TopEC < sd2down | TopEC > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(TopEC), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanTopEC = mean(TopEC, na.rm = T),
+         sd2down = meanTopEC - 2 * sd(TopEC, na.rm = T),
+         sd2up = meanTopEC + 2 * sd(TopEC, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((TopEC < sd2down | TopEC > sd2up), T, F),
+         NAFlag = ifelse(is.na(TopEC), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Month, Station, TopEC, meanTopEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, TopEC, meanTopEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # Edit – Bottom EC III
 outliers$BottomEC <- data$`Water Info` %>% 
   group_by(Station) %>% 
-  mutate(# This is part 1 of the query
-    meanBottomEC = mean(BottomEC, na.rm = T),
-    sd2down = meanBottomEC - 2 * sd(BottomEC, na.rm = T),
-    sd2up = meanBottomEC + 2 * sd(BottomEC, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((BottomEC < sd2down | BottomEC > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(BottomEC), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanBottomEC = mean(BottomEC, na.rm = T),
+         sd2down = meanBottomEC - 2 * sd(BottomEC, na.rm = T),
+         sd2up = meanBottomEC + 2 * sd(BottomEC, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((BottomEC < sd2down | BottomEC > sd2up), T, F),
+         NAFlag = ifelse(is.na(BottomEC), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Station, BottomEC, meanBottomEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, BottomEC, meanBottomEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # BottomECMonth
 outliers$BottomECMonth <- data$`Water Info` %>% 
   group_by(Station, Month = month(Date)) %>% 
-  mutate(# This is part 1 of the query
-    meanBottomEC = mean(BottomEC, na.rm = T),
-    sd2down = meanBottomEC - 2 * sd(BottomEC, na.rm = T),
-    sd2up = meanBottomEC + 2 * sd(BottomEC, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((BottomEC < sd2down | BottomEC > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(BottomEC), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanBottomEC = mean(BottomEC, na.rm = T),
+         sd2down = meanBottomEC - 2 * sd(BottomEC, na.rm = T),
+         sd2up = meanBottomEC + 2 * sd(BottomEC, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((BottomEC < sd2down | BottomEC > sd2up), T, F),
+         NAFlag = ifelse(is.na(BottomEC), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Month, Station, BottomEC, meanBottomEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, BottomEC, meanBottomEC, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # Edit – Secchi III
 outliers$Secchi <- data$`Water Info` %>% 
   group_by(Station) %>% 
-  mutate(# This is part 1 of the query
-    meanSecchi = mean(Secchi, na.rm = T),
-    sd2down = meanSecchi - 2 * sd(Secchi, na.rm = T),
-    sd2up = meanSecchi + 2 * sd(Secchi, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Secchi < sd2down | Secchi > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Secchi), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanSecchi = mean(Secchi, na.rm = T),
+         sd2down = meanSecchi - 2 * sd(Secchi, na.rm = T),
+         sd2up = meanSecchi + 2 * sd(Secchi, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((Secchi < sd2down | Secchi > sd2up), T, F),
+         NAFlag = ifelse(is.na(Secchi), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Station, Secchi, meanSecchi, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, Secchi, meanSecchi, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # SecchiMonth
 outliers$SecchiMonth <- data$`Water Info` %>% 
   group_by(Station, Month = month(Date)) %>% 
-  mutate(# This is part 1 of the query
-    meanSecchi = mean(Secchi, na.rm = T),
-    sd2down = meanSecchi - 2 * sd(Secchi, na.rm = T),
-    sd2up = meanSecchi + 2 * sd(Secchi, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Secchi < sd2down | Secchi > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Secchi), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanSecchi = mean(Secchi, na.rm = T),
+         sd2down = meanSecchi - 2 * sd(Secchi, na.rm = T),
+         sd2up = meanSecchi + 2 * sd(Secchi, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((Secchi < sd2down | Secchi > sd2up), T, F),
+         NAFlag = ifelse(is.na(Secchi), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Month, Station, Secchi, meanSecchi, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, Secchi, meanSecchi, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # Edit – Turbidity III
 outliers$Turbidity <- data$`Water Info` %>% 
   group_by(Station) %>% 
-  mutate(# This is part 1 of the query
-    meanTurbidity = mean(Turbidity, na.rm = T),
-    sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
-    sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanTurbidity = mean(Turbidity, na.rm = T),
+         sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
+         sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up), T, F),
+         NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Station, Turbidity, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, Turbidity, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # TurbidityMonth
 outliers$TurbidityMonth <- data$`Water Info` %>% 
   group_by(Station, Month = month(Date)) %>% 
-  mutate(# This is part 1 of the query
-    meanTurbidity = mean(Turbidity, na.rm = T),
-    sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
-    sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
+  mutate(SeasonYear = year(Date) + (month(Date) > 11),
+         # This is part 1 of the query
+         meanTurbidity = mean(Turbidity, na.rm = T),
+         sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
+         sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
+         # This is part 2 of the query
+         Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up), T, F),
+         NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, Month, Station, Turbidity, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, Turbidity, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
-  filter(Outlier == T | NAFlag == T) %>% 
+  filter(Outlier == T | NAFlag == T,
+         SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
 # Various plots for station vs station/months -----------------------------
-# This are simply exploratory plots to see how the two variants differ from one another
-# Does one variant yield much more "outliers" than others?
-
-data$`Water Info` %>%
-  group_by(Station, Month = month(Date)) %>%
-  mutate(# This is part 1 of the query
-    meanTemp = mean(Temp, na.rm = T),
-    sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-    sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Temp < sd2down | Temp > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Temp), T, F)) %>%
-  arrange(Date) %>%
-  # This is part 3 of the query
-  select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
-  mutate(Date = as.Date(Date)) %>%
-  ggplot(aes(Date, Temp, color = Outlier)) +
-  geom_point() +
-  labs(title = "Grouped by station and month")
-# Seems like for temp, it might be worth it to use a "region" to calculate the mean/sd or exclude certain stations
-# Alot of these outliers also appear to have occurred during the drought, with the higher temps being a bit outlying
-
-data$`Water Info` %>%
-  group_by(Station) %>%
-  mutate(# This is part 1 of the query
-    meanTemp = mean(Temp, na.rm = T),
-    sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-    sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
-    # This is part 2 of the query
-    # Why this 12-31 cut off...? Ask Adam ####
-    Outlier = ifelse((Temp < sd2down | Temp > sd2up) & Date > as.Date("2012-12-31"), T, F),
-    NAFlag = ifelse(is.na(Temp), T, F)) %>%
-  arrange(Date) %>%
-  # This is part 3 of the query
-  select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
-  mutate(Date = as.Date(Date)) %>%
-  ggplot(aes(Date, Temp, color = Outlier)) +
-  geom_point() +
-  labs(title = "Grouped by station Only")
-
-# As expected, the only station variant will flag extreme values across all years, so mostly during the drought, while
-# the Month variant will have more subtle outliers that appears to be similar to other datapoints around it when plotted
-# this way
-
-# How many more outliers are in the monthly variant?
-purrr::map_df(outliers, function(x) data.frame = c(n = nrow(x)), .id = "parameter") %>% 
-  mutate(scale = ifelse(str_detect(parameter, "Month"), "Station, Month", "Station"),
-         parameter = str_remove(parameter, "Month"),
-         parameter = factor(parameter, levels = c(.$parameter))) %>% 
-  ggplot(aes(parameter, n, fill = scale)) + 
-  geom_col(position = "dodge") +
-  labs(title = "Number of outliers similar, more varied on location of outliers")
-# About the same amount of outliers either way; personally think it's very slightly more robust to at least
-# try and account for seasonality if this comparison to the 95% of all values approach is to be kept. There
-# doesn't seem to be to many more flagged values
+# # These are simply exploratory plots to see how the two variants differ from one another
+# # Does one variant yield much more "outliers" than others?
+# 
+# data$`Water Info` %>%
+#   group_by(Station, Month = month(Date)) %>%
+#   mutate(# This is part 1 of the query
+#     meanTemp = mean(Temp, na.rm = T),
+#     sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
+#     sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
+#     # This is part 2 of the query
+#     Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
+#     NAFlag = ifelse(is.na(Temp), T, F)) %>%
+#   arrange(Date) %>%
+#   # This is part 3 of the query
+#   select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
+#   mutate(Date = as.Date(Date)) %>%
+#   ggplot(aes(Date, Temp, color = Outlier)) +
+#   geom_point() +
+#   labs(title = "Grouped by station and month")
+# # Seems like for temp, it might be worth it to use a "region" to calculate the mean/sd or exclude certain stations
+# # Alot of these outliers also appear to have occurred during the drought, with the higher temps being a bit outlying
+# 
+# data$`Water Info` %>%
+#   group_by(Station) %>%
+#   mutate(# This is part 1 of the query
+#     meanTemp = mean(Temp, na.rm = T),
+#     sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
+#     sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
+#     # This is part 2 of the query
+#     Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
+#     NAFlag = ifelse(is.na(Temp), T, F)) %>%
+#   arrange(Date) %>%
+#   # This is part 3 of the query
+#   select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
+#   mutate(Date = as.Date(Date)) %>%
+#   ggplot(aes(Date, Temp, color = Outlier)) +
+#   geom_point() +
+#   labs(title = "Grouped by station Only")
+# 
+# # As expected, the "only station" variant will flag extreme values across all years, so mostly during the drought, while
+# # the Month variant will have more subtle outliers that appears to be similar to other datapoints around it when plotted
+# # this way
+# 
+# # How many more outliers are in the monthly variant?
+# purrr::map_df(outliers, function(x) data.frame = c(n = nrow(x)), .id = "parameter") %>% 
+#   mutate(scale = ifelse(str_detect(parameter, "Month"), "Station, Month", "Station"),
+#          parameter = str_remove(parameter, "Month"),
+#          parameter = factor(parameter, levels = c(.$parameter))) %>% 
+#   ggplot(aes(parameter, n, fill = scale)) + 
+#   geom_col(position = "dodge") +
+#   labs(title = "Number of outliers similar, more varied on location of outliers")
+# # About the same amount of outliers either way; personally think it's very slightly more robust to at least
+# # try and account for seasonality if this comparison to the 95% of all values approach is to be kept. There
+# # doesn't seem to be to many more flagged values
 
 # Plotting the GPS coordinates --------------------------------------------
 
@@ -410,10 +458,7 @@ purrr::map_df(outliers, function(x) data.frame = c(n = nrow(x)), .id = "paramete
 # geodistance calculations to cluster potential outliers to potentially flag outliers
 
 GPSDF <- data$`Water Info` %>% 
-  # Fixing the GPS coordinates; the SLS that is uploaded to the FTP site does NOT
-  # contain the Lon/Lat in hours, minutes, and seconds. Instead, it appears to only contain Lon/Lat
-  # columns that are simply pasted values of these 3 metrics; this is not the correct way to convert
-  # from hours/minutes/seconds to degrees; fixing here
+  # Converting the GPS coordinates from H/M/S to degrees
   mutate(across(c(Lat, Long), ~str_remove(.x, "\\.") %>% str_remove_all("\\-")),
          LatD = str_sub(Lat, start = 1, end = 2),
          LatM = str_sub(Lat, start = 3, end = 4),
@@ -492,16 +537,17 @@ geo.dist = function(df) {
 
 # Function to analyze for outliers based on spatial distances and hierarchical clustering;
 # if k is specified, will also plot the clusters 
-findOutlierGPS <- function(df, station = NULL, Year = NULL, k = NULL) {
+findOutlierGPS <- function(df, station = NULL, Year = NULL, 
+                           k = NULL, print = T) {
   
   if (!is.null(station)) df <- filter(df, Station %in% station)
   
   if (!is.null(Year)) df <- filter(df, SeasonYear %in% Year)
   
   d <- geo.dist(select(df, Long, Lat) %>% 
-                  remove_missing())
+                  na.omit())
   hc <- hclust(d)
-  plot(hc)
+  if (print) plot(hc)
   
   if (!is.null(k)) {
     # Specifying the cluster
@@ -509,7 +555,7 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL, k = NULL) {
       filter(!is.na(Long), !is.na(Lat)) %>% 
       mutate(group = cutree(hc, k))
     
-    print(plotGPS(dfClust, station = station, Year = Year, title = "Cluster"))
+    if (print) print(plotGPS(dfClust, station = station, Year = Year, title = "Cluster"))
     
     dfClust %>% 
       arrange(-group)
@@ -517,14 +563,17 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL, k = NULL) {
 }
 
 # Edit – GPS Coordinates
-# These are stations that I see that may be outlying; k was chosen after visual inspection of the produced dendogram
+# These are stations that I see that may be outlying; 
+# k was chosen after visual inspection of the produced dendogram
+# print = F used AFTER confirming with the visualizations that this is what you want
+
 GPSOutlying <- list()
-GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2)
-GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 609, k = 2)
-GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 606, k = 2)
-GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 610, k = 5)
-GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 520, k = 2)
-GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 915, k = 3)
+GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2, print = F)
+GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 609, k = 2, print = F)
+GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 606, k = 2, print = F)
+GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 610, k = 5, print = F)
+GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 520, k = 2, print = F)
+GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 915, k = 3, print = F)
 
 # For multiple stations, can bind these together into a singular data frame
 # Would envision all clusters other than 1 would be classified as outliers, something like:
@@ -533,8 +582,9 @@ outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, group != 1)
   mutate(Outlier = T) %>% 
   bind_rows(data$`Water Info` %>% 
               # This gives a warning of NAs introduced by coercion; can ignore given that these are NAs to start with
+              # Will simply supress this because it is not a valid warning
               filter(is.na(Lat) | is.na(Long)) %>% 
-              mutate(across(c(Lat, Long), ~as.numeric(.x)),
+              mutate(across(c(Lat, Long), ~suppressWarnings(as.numeric(.x))),
                      NAFlag = T,
                      Outlier = F)) %>% 
   mutate(NAFlag = ifelse(is.na(NAFlag), F, NAFlag))
@@ -584,10 +634,10 @@ outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, group != 1)
 
 # This is a temp name
 # Adding the 3 columns that Adam requested for the ES in charge to fill in to document result of analysis
-tryThis <- lapply(outliers, function(x) mutate(x, IsOutlier = NA, ChangedTo = NA, CommentsOutlier = NA,
+saveSheet <- lapply(outliers, function(x) mutate(x, IsOutlier = NA, ChangedTo = NA, CommentsOutlier = NA,
                                                # Strange XML character in some rows of the comments column in the
                                                # Water Info table; removing this so that the excel file saves correctly
                                                across(where(is.character), ~str_replace_all(.x, "\uFFFD", ""))))
 
 # Saving the file; this will save to the current directory, which by default is in the parent folder; will change this later
-writexl::write_xlsx(tryThis, "outliers.xlsx")
+writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "SLS", paste0("SLS_outliers_", today(), ".xlsx")))
