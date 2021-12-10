@@ -1,10 +1,10 @@
+# K.Alstad 12/10/2021
 # This script is a derivative of Trinh's code, but does not download the Access database from the public FTP website
 # Rather, this code is intended to be used locally to work with Access db on the U: directory
-# To get the Access connection to work, you will need the DBI and odbc packages
+# This program is run by the readAccess1.R program which identifies which version of R
+# and uses 32bit to run DBI and odbc packages
 # You will also need R in the same architecture as your Access database
-# https://filelib.wildlife.ca.gov/Public/BayStudy/AccessDatabase/
-
-
+# The code below will set up a subfolder for the output files
 
 
 # SPECIFY LOCATION OF DB FILE AND SHORT SURVEY NAME FOR OUTPUT FOLDER
