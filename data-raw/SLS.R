@@ -5,10 +5,22 @@
 # To get the Access connection to work, you will need the DBI and odbc packages
 # You will also need R in the same architecture as your Access database 
 
+# This will evaluate arguments accompanied with the terminal command to use in this specific script
+args = commandArgs(T)
+# Currently, commandArgs is set up so that:
+# first argument is the bypass arg; 
+# second argument is the file arg;
+# the rest will be the names of the table that you want. There isn't leeway for edge cases yet
+
 # Function to download the SLS database. Change the ftp website url as required
 downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Smelt",
                         surveyName = "SLS",
-                        extension = ".zip") {
+                        extension = ".zip",
+                        bypass = args[1]) {
+  
+  if (bypass) {
+    return(cat("Bypass was specified, not downloading from the FTP site. \n"))
+  }
   
   # # Does this file already exists? If so, do not download again. Useful for running
   # # this command multiple times during a session. This is because the FTP server
@@ -44,21 +56,30 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
 }
 
 # Function to start reading data from Access directly
-readSLSAccess <- function(file = tempFile,
+readSLSAccess <- function(file = args[2],
                           exdir = tempdir(),
                           surveyName = "SLS",
-                          returnDF = F) {
+                          returnDF = F,
+                          tablesReturned = args[-(1:2)]) {
 
-  cat("\n")
-  cat("Connecting to Access \n")
+  cat("\nConnecting to Access \n")
   
   # In order to use this correctly, you need to have the 32-bit version of R installed
-  # This function is used with system() below to create an RDA file 
+  # This function is used with system() below to create an rds file 
   # required by the rest of the script
-  tempFile <- list.files(tempdir())[grep("*.+zip", list.files(tempdir()))]
   
-  # Extracting the downloaded file from downloadSLS()
-  localDbFile <- unzip(zipfile = file.path(exdir, tempFile), exdir = exdir)
+  # If the downloadSLS() function was used to download the SLS files, then it will be stored in the 
+  # temp directory, of which will pull here
+  if (is.null(file)) {
+    tempFile <- list.files(tempdir())[grep("*.+zip", list.files(tempdir()))]
+    
+    # Extracting the downloaded file from downloadSLS()
+    if (grepl(".zip", tempFile)) {
+      localDbFile <- unzip(zipfile = file.path(exdir, tempFile), exdir = exdir)
+    }
+  } else {
+    localDbFile <- file
+  }
   
   # Driver and path required to connect from RStudio to Access
   dbString <- paste0("Driver={Microsoft Access Driver (*.mdb, *.accdb)};",
@@ -75,14 +96,22 @@ readSLSAccess <- function(file = tempFile,
                     }
                   })
 
-  # Pulling just the table names to be used in map() below
+  # Pulling just the table names to be used in mapply() below
   tableNames <- odbc::dbListTables(conn = con)
   # Includes system tables which cannot be read, excluding them below with negate
-  tableNames <- stringr::str_subset(tableNames, "MSys", negate = T)
+  # tableNames <- stringr::str_subset(tableNames, "MSys", negate = T)
+  if (is.null(tablesReturned)) {
+    # If no table names are specified, then simply return the names of the possible databases for the user to pick
+    DBI::dbDisconnect(con)
+    
+    return(odbc::dbListTables(conn = con))
+  }
+  
+  cat("Pulling tables:", tablesReturned, "\n")
   
   # Apply the dbReadTable to each readable table in db
   SLSTables <- mapply(DBI::dbReadTable,
-                      name = tableNames,
+                      name = tablesReturned,
                       MoreArgs = list(conn = con))
   
   # Cleaning up connection
@@ -126,15 +155,16 @@ readSLSAccess <- function(file = tempFile,
     } else {
       cat("All tables exported successfully \n")
     }
-    cat("Exporting rda file \n")
-    browser()
+    cat("Exporting rds file \n")
+    
     # Now returning the rda
     saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rds"),
             compress = T)
     
-    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rda"))) cat("RDA file created successfully  \n")
+    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rds"))) cat("RDA file created successfully  \n")
     else (stop("RDA file was NOT created, something failed!"))
   }
+  cat("\nDone! \n")
 }
 
 # Run the functions to download and read the database

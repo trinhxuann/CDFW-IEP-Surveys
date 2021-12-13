@@ -6,7 +6,11 @@
 # save the necessary out file(s)
 # output files will be in the their respective survey folders as csv or rda files
 
-pullAccessDF <- function(file = c("SLS.R")) {
+pullAccessDF <- function(script = "SLS.R",
+                         bypass = T,
+                         file = "U:\\NativeFish\\SmeltData\\DS-DATA\\SLS_Query.mdb",
+                         tablesReturned = c("Catch", "Lengths", "MeterCorrections",
+                                           "TowInfo", "WaterInfo", "Station_Lookup")) {
   
   # file.exists(paste0(Sys.getenv("ProgramFiles"), "/Microsoft Office/root/Office16/ODBC32.DLL"))
   # # Will need to check this on a computer with 64bit Access to see if there is an ODBC64.DLL?
@@ -22,13 +26,23 @@ pullAccessDF <- function(file = c("SLS.R")) {
       stop("A 32-bit R could not be found on this machine", call. = F)
     }
     
-    filePath <- file.path(getwd(), "data-raw", file)
+    filePath <- file.path(getwd(), "data-raw", script)
     
     if (grepl("\\s", filePath)) stop("The filepath has a space somewhere along the path. Please remove the space.")
     
-    terminalOutput <- system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", filePath), 
+    terminalOutput <- system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", filePath,
+                                    " ", bypass, 
+                                    " ", file,
+                                    " ", paste0(tablesReturned, collapse = " ")), 
                              wait = T)
   }
 }
 
-pullAccessDF(file = "SLS.R")
+pullAccessDF()
+
+# Running the QAQC code ---------------------------------------------------
+
+# Need to change this to accomodate file names....
+source(file.path("data-raw", "SLS_QAQC.R"))
+
+
