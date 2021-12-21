@@ -40,9 +40,3 @@ pullAccessDF <- function(script = "SLS.R",
 
 pullAccessDF()
 
-# Running the QAQC code ---------------------------------------------------
-
-# Need to change this to accomodate file names....
-source(file.path("data-raw", "SLS_QAQC.R"))
-
-

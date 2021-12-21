@@ -5,6 +5,11 @@
 # To get the Access connection to work, you will need the DBI and odbc packages
 # You will also need R in the same architecture as your Access database 
 
+# Libraries needed
+library(dplyr, warn.conflicts = F)
+library(DBI)
+library(odbc)
+
 # This will evaluate arguments accompanied with the terminal command to use in this specific script
 args = commandArgs(T)
 # Currently, commandArgs is set up so that:
@@ -29,6 +34,7 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
     return("File has already been created. Not downloading again.")
   }
   
+  library(rvest)
   # Fetch the SLS name from the ftp website
   # Create websession
   startingSession <- xml2::read_html(x = url)
@@ -79,6 +85,7 @@ readSLSAccess <- function(file = args[2],
     }
   } else {
     localDbFile <- file
+    if (!file.exists(file)) stop("File path not found. Did you specify right? Are you on VPN?", call. = F)
   }
   
   # Driver and path required to connect from RStudio to Access
@@ -117,6 +124,24 @@ readSLSAccess <- function(file = args[2],
   # Cleaning up connection
   # The downloaded files will be auto deleted once R shuts down
   DBI::dbDisconnect(con)
+  
+  # Need to remove extra columns from the database. Will select only the columns that matter:
+  # Catch table = ok as is
+  # Length table
+  SLSTables$Lengths <- SLSTables$Lengths %>% 
+    select(Date, Station, Tow, FishCode, Length, EntryOrder, YolkSacOrOilPresent)
+  # Meter Correction = ok as i
+  # Tow Info
+  SLSTables$TowInfo <- SLSTables$TowInfo %>% 
+    select(Date, Station, Tow, Time, Tide, BottomDepth, CableOut, Duration,
+           NetMeterSerial, NetMeterStart, NetMeterEnd, NetMeterCheck, Comments)
+  # Water Info
+  SLSTables$WaterInfo <- SLSTables$WaterInfo %>% 
+    select(Survey, Date, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
+           Lat, Long, Comments)
+  # Station_Lookup
+  SLSTables$Station_Lookup <- SLSTables$Station_Lookup %>% 
+    select(ID, Station, Description, Lat, Long)
   
   # For instances where you do not want to write the rda and want to work 
   # entirely in this environment, returnDF will be used
