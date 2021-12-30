@@ -54,18 +54,29 @@ Phone: (209) 234-3420
 
 ##### **Geographic range of work:** Lower Napa River to the city of Napa, eastern Carquinez Strait upstream throughout Suisun Bay; San Joaquin River to Stockton, Old and Middle Rivers in the south Delta to West Canal; Sacramento River to Rio Vista; Cache Slough from Rio Vista to Shag Slough; 1 station at the mouth of the Sacramento Deep-water Ship Channel. 
 
+
 ```{r, overall map, echo = F, results='asis', fig.cap="Figure 1. Map of all SLS sampling stations. Each point represents the location of a station by the SLS survey. Stations that are specifically called out by the 2020 SWP ITP Conditions of Approvals are uniquely colored."}
 # I'm going to just use the LTMRdata package here for now for SLS; depending on Sam's answer on if I can just piggy back off of his package or not, I will change this later
 
-specialStations <- data.frame(Station = as.character(c(716, 809, 812, 815, 901, 902, 906, 910, 912, 914, 915, 918, 919)),
+specialStations <- data.frame(Station = c(716, 809, 812, 815, 901, 902, 906, 910, 912, 914, 915, 918, 919),
                               Status = c("Barker ITP Station", rep("SWP ITP Criteria Stations", 12)))
 
 # To color the stations on the map accordingly
 pal <- colorFactor("viridis", domain = c(specialStations$Status, "SLS Stations"))
 
-leaflet(LTMRdata::SLS %>% 
-            distinct(Station, Latitude, Longitude) %>% 
-            left_join(specialStations, by = "Station") %>% 
+leaflet(read.csv(file.path("data-raw", "SLS", "Station_lookup.csv")) %>%
+            mutate(LatD = sapply(strsplit(.$Lat, "\\s"), "[", 1),
+                     LatM = sapply(strsplit(.$Lat, "\\s"), "[", 2),
+                     LatS = sapply(strsplit(.$Lat, "\\s"), "[", 3),
+                     LonD = sapply(strsplit(.$Long, "\\s"), "[", 1),
+                     LonM = sapply(strsplit(.$Long, "\\s"), "[", 2),
+                     LonS = sapply(strsplit(.$Long, "\\s"), "[", 3),
+                     across(c(LatD, LatM, LatS, LonD, LonM, LonS), as.numeric)) %>%
+              transmute(Station,
+                        Latitude = LatD + LatM/60 + LatS/3600,
+                        Longitude = -(LonD + LonM/60 + LonS/3600),
+                        group = "TheoreticalCoords") %>%
+            left_join(specialStations, by = "Station") %>%
             mutate(Status = factor(ifelse(is.na(Status), "SLS Stations", Status),
                                    levels = c("SLS Stations", "Barker ITP Station", "SWP ITP Criteria Stations"))),
         width = "100%",
@@ -80,7 +91,7 @@ leaflet(LTMRdata::SLS %>%
                                                  offset = c(18,0),
                                                  textOnly = T,
                                                  textsize = "12px",
-                                                 direction = "center")) %>% 
+                                                 direction = "center")) %>%
   addLegend(pal = pal, values = ~Status, opacity = 1)
 ```
 
@@ -162,7 +173,7 @@ The years listed below are water years, which begins three months before the new
 
 2021 – Two additional surveys added in December. These surveys are limited in geographic range to the south and central delta.
 
-2022- The two additional surveys in December are expanded to encompass all stations. Napa River stations (340, 342, 343, 344, 345, 346, 347, 348, and 349) have been added back to the surveys, including the supplemental December surveys. 
+2022- The two additional surveys in December are expanded to encompass all stations. Napa River stations (340, 342, 343, 344, 345, 346, 347, 348, and 349) have been added back to the surveys, including the supplemental December surveys.
 
 ##### **Station metadata** {#metadata}
 

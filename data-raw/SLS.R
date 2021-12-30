@@ -1,7 +1,9 @@
 # This script is meant to bridge between the Access database and Sam's LTMRdata package
 # Since the LTMR data package takes in individual flat files as inputs, this script
 # will simply connect to Access, pull the relevant tables, export it via text/csv, and finish
-# The function will download the Access database from the public FTP website into the working directory
+# The function will download the Access database from the public FTP website or connect
+# To the file located on the UDrive for manipulations. The UDrive option is default.
+# To use the UDrive, one must be connected to the UDrive via being in the office or via VPN.
 # To get the Access connection to work, you will need the DBI and odbc packages
 # You will also need R in the same architecture as your Access database 
 
@@ -11,7 +13,10 @@ library(DBI)
 library(odbc)
 
 # This will evaluate arguments accompanied with the terminal command to use in this specific script
-args = commandArgs(T)
+if (!exists("Args")) {
+  Args = commandArgs(T)
+} 
+
 # Currently, commandArgs is set up so that:
 # first argument is the bypass arg; 
 # second argument is the file arg;
@@ -21,16 +26,18 @@ args = commandArgs(T)
 downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Smelt",
                         surveyName = "SLS",
                         extension = ".zip",
-                        bypass = args[1]) {
+                        bypass = Args[1]) {
+  
+  if (is.na(bypass)) bypass <- F
   
   if (bypass) {
     return(cat("Bypass was specified, not downloading from the FTP site. \n"))
   }
-  
+
   # # Does this file already exists? If so, do not download again. Useful for running
   # # this command multiple times during a session. This is because the FTP server
   # # will limit connections to it if it is made too often
-  if (file.exists(file.path(tempdir(), paste0("SLS", ".zip")))) {
+  if (file.exists(file.path(tempdir(), paste0(surveyName, ".zip")))) {
     return("File has already been created. Not downloading again.")
   }
   
@@ -44,7 +51,8 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
   links <- rvest::html_attr(nodes, "href")
   # Subset only the relevant link for the survey of interest
   surveyLink <- stringr::str_subset(links, paste0(surveyName, "*.+", extension))
-  surveyName <- surveyName
+  
+  # surveyName <- surveyName
   fileName <- sub(".*/", "", surveyLink)
   # Doing it this way to hopefully it make more robust to weird changes in the future
   # for eg, 20mm is not just 20mm.zip, but 20mm_New.zip
@@ -62,11 +70,11 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
 }
 
 # Function to start reading data from Access directly
-readSLSAccess <- function(file = args[2],
+readSLSAccess <- function(file = Args[2],
                           exdir = tempdir(),
                           surveyName = "SLS",
                           returnDF = F,
-                          tablesReturned = args[-(1:2)]) {
+                          tablesReturned = Args[-(1:2)]) {
 
   cat("\nConnecting to Access \n")
   
@@ -76,8 +84,8 @@ readSLSAccess <- function(file = args[2],
   
   # If the downloadSLS() function was used to download the SLS files, then it will be stored in the 
   # temp directory, of which will pull here
-  if (is.null(file)) {
-    tempFile <- list.files(tempdir())[grep("*.+zip", list.files(tempdir()))]
+  if (is.na(file) | file == shQuote("NA") | file == "NA") {
+    tempFile <- list.files(tempdir())[grep(paste0(surveyName, "*.+zip"), list.files(tempdir()))]
     
     # Extracting the downloaded file from downloadSLS()
     if (grepl(".zip", tempFile)) {
@@ -126,22 +134,56 @@ readSLSAccess <- function(file = args[2],
   DBI::dbDisconnect(con)
   
   # Need to remove extra columns from the database. Will select only the columns that matter:
-  # Catch table = ok as is
+  # Catch table = ok as is, for both the FTP and UDrive databases
   # Length table
-  SLSTables$Lengths <- SLSTables$Lengths %>% 
+  lengthPosition <- which(sapply(SLSTables, 
+                                 function(tables) any(grepl("Length", 
+                                                            x = names(tables), 
+                                                            ignore.case = T))))
+  # There are strange naming differences of the same column in the two databases...squaring up now
+  # Args[[1]] should be the "Bypass" argument
+  if (Args[[1]] == "FALSE") {
+    EntryOrder = "entryorder"
+    YolkSacOrOilPresent = "YolkSacorOilPresent"
+  }
+  
+  SLSTables[[lengthPosition]] <- SLSTables[[lengthPosition]] %>% 
     select(Date, Station, Tow, FishCode, Length, EntryOrder, YolkSacOrOilPresent)
   # Meter Correction = ok as i
   # Tow Info
-  SLSTables$TowInfo <- SLSTables$TowInfo %>% 
+  towPosition <- which(sapply(SLSTables, 
+                              function(tables) any(grepl("BottomDepth", 
+                                                         x = names(tables), 
+                                                         ignore.case = T))))
+  
+  SLSTables[[towPosition]] <- SLSTables[[towPosition]] %>% 
     select(Date, Station, Tow, Time, Tide, BottomDepth, CableOut, Duration,
            NetMeterSerial, NetMeterStart, NetMeterEnd, NetMeterCheck, Comments)
   # Water Info
-  SLSTables$WaterInfo <- SLSTables$WaterInfo %>% 
+  waterPosition <- which(sapply(SLSTables, 
+                              function(tables) any(grepl("Temp|Secchi", 
+                                                         x = names(tables), 
+                                                         ignore.case = T))))
+  
+  SLSTables[[waterPosition]] <- SLSTables[[waterPosition]] %>% 
     select(Survey, Date, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
            Lat, Long, Comments)
   # Station_Lookup
-  SLSTables$Station_Lookup <- SLSTables$Station_Lookup %>% 
-    select(ID, Station, Description, Lat, Long)
+  stationPosition <- which(sapply(SLSTables, 
+                                  function(tables) any(grepl("RKI", 
+                                                             x = names(tables), 
+                                                             ignore.case = T))))
+  
+  if (!identical(unname(stationPosition), integer(0))) {
+    SLSTables[[stationPosition]] <- SLSTables[[stationPosition]] %>% 
+      select(Station, LatD, LatM, LatS, LonD, LonM, LonS, 
+             RKI, Location, AreaCode, Notes)
+  } else {
+    stationPosition <- which(names(SLSTables) %in% "Station_Lookup")
+    
+    SLSTables[[stationPosition]] <- SLSTables[[stationPosition]] %>% 
+      select(ID, Station, Description, Lat, Long)
+  }
   
   # For instances where you do not want to write the rda and want to work 
   # entirely in this environment, returnDF will be used
@@ -192,6 +234,6 @@ readSLSAccess <- function(file = args[2],
   cat("\nDone! \n")
 }
 
-# Run the functions to download and read the database
+# # Run the functions to download and read the database
 downloadSLS()
 readSLSAccess()

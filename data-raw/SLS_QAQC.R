@@ -95,7 +95,12 @@ plotGPS <- function(df, station = NULL, Year = NULL, ...) {
     warning("This will plot all tows in the requested data table and may take a substantial amount of resources to complete.", call. = F)
   } else {
     df <- df %>% 
-      filter(SeasonYear == Year | group == "TheoreticalCoords")
+      filter(SeasonYear == Year | group == "TheoreticalCoords" | is.numeric(group))
+  }
+  
+  if (!is.null(station)) {
+    df <- df %>% 
+      filter(Station == station)
   }
   
   leaflet(df,
@@ -118,6 +123,8 @@ plotGPS <- function(df, station = NULL, Year = NULL, ...) {
 # Example: this plots ALL stations across a year of interest; Year can be left blank if
 # you want all stations across all years plotted (will be slow though)
 plotGPS(GPSDF, Year = 2021, title = "Source")
+plotGPS(GPSDF, Year = 2022, title = "Source")
+plotGPS(GPSDF, Year = 2022, station = 809, title = "Source")
 
 # Use findOutlierGPS after running plotGPS and visually determining which stations/year may have 
 
@@ -141,27 +148,43 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
   
   if (!is.null(station)) df <- filter(df, Station %in% station)
   
-  if (!is.null(Year)) df <- filter(df, SeasonYear %in% Year)
+  # need the TheoreticalCoords filter because those do not have a year associated with them; ok to do it here
+  # since the station filter goes first. When year is specified and no station, will display all theoretical stations
+  # the is numeric group is for AFTER cluster have been chosen, so for dfClust df in the findOutlierGPS() function
+  if (!is.null(Year)) df <- filter(df, SeasonYear %in% Year | group %in% "TheoreticalCoords")
   
   d <- geo.dist(select(df, Long, Lat) %>% 
                   na.omit())
   hc <- hclust(d)
   
-  if (print) plot(hc)
+  if (print & length(hc$order) > 2) plot(hc)
   
   if (!is.null(k)) {
     clusters <- cutree(hc, k)
-    
+    browser()
     # Specifying the cluster
     dfClust <- df %>% 
       filter(!is.na(Long), !is.na(Lat)) %>% 
-      mutate(group = clusters) %>% 
+      # A bit of coding to get the theoretical coords to always be cluster 1
+      # First, convert group into a factor with levels to arrange correctly
+      # Second, create groupOrder as a factor and pull the numeric version of it to assign as clusters
+      mutate(source = factor(group, levels = c("TheoreticalCoords", "Tow")),
+             groupOrder = ifelse(group == "TheoreticalCoords", group, clusters)) %>% 
+      arrange(source) %>% 
+      mutate(groupOrder = factor(groupOrder, levels = unique(.$groupOrder)),
+             group = as.numeric(groupOrder)) %>% 
       group_by(group) %>% 
       add_tally() %>% 
-      ungroup() %>% 
-      # Going to make a "safe" assumption here that the outlying cluster is the one that does not 
-      # have the most number of entries
-      mutate(Outlier = ifelse(n == max(n), F, T))
+      ungroup()
+    
+    # Making the assumption here that if it is NOT in the same group as the theoretical coordinates,
+    # then it is outlying
+    theoreticalCluster <- dfClust %>% 
+      filter(is.na(Date), is.na(Temp), is.na(LonD)) %>% 
+      pull(group)
+    
+    dfClust <- dfClust %>% 
+      mutate(Outlier = ifelse(group == theoreticalCluster, F, T))
     
     if (print) print(plotGPS(dfClust, station = station, Year = Year, title = "Cluster"))
     
@@ -169,6 +192,9 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
       select(Date, SeasonYear, Survey, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
              Lat, Long, Comments, Outlier) %>% 
       arrange(-Outlier)
+  } else {
+    cat("Pick a the number of clusters, k using the map displayed. \n")
+    plotGPS(df, station = station, Year = Year, title = "Source")
   }
 }
 
@@ -179,16 +205,25 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
 # print = F used AFTER confirming with the visualizations that this is what you want
 
 GPSOutlying <- list()
-GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2, print = F)
-GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 609, k = 2, print = F)
-GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 606, k = 2, print = F)
-# Um this messed this up...
-GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 610, k = 5, print = F)
-GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 520, k = 2, print = F)
-GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 915, k = 3, print = F)
-# Maybe 1 station outlying in season year 2021
-GPSOutlying[[7]] <- findOutlierGPS(GPSDF, station = 815, Year = 2021, k = 2, print = F)
+# GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022)
+GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022, k = 2)
+GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
+GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
+GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2)
 
+# Might be useful to plot all years data for the particular station of interest?
+
+# findOutlierGPS(GPSDF, station = 610)
+# findOutlierGPS(GPSDF, station = 610, k = 4)
+# 
+# GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2, print = F)
+# GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 609, k = 2, print = F)
+# GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 606, k = 2, print = F)
+# GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 610, k = 5, print = F)
+# GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 520, k = 2, print = F)
+# GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 915, k = 3, print = F)
+# # Maybe 1 station outlying in season year 2021
+# GPSOutlying[[7]] <- findOutlierGPS(GPSDF, station = 815, Year = 2021, k = 2, print = F)
 
 # For multiple stations, can bind these together into a singular data frame
 # Would envision all clusters other than 1 would be classified as outliers, something like:
@@ -205,6 +240,8 @@ outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, Outlier == 
                      Outlier = F)) %>% 
   mutate(NAFlag = ifelse(is.na(NAFlag), F, NAFlag),
          SeasonYear = ifelse(is.na(SeasonYear), year(Date) + (month(Date) > 11), SeasonYear))
+# Note, this does NOT have a SeasonYear %in% yearOfInterest filter; this step should of been taken care of
+# when manually surveying which station is outlying
 
 # Cable outliers ----------------------------------------------------------
 
@@ -256,8 +293,9 @@ outliers$CableDepth <- full_join(data$WaterInfo, data$TowInfo,
 
 outliers$MeterReading <- full_join(data$WaterInfo, data$TowInfo,
                                    by = c("Date", "Station")) %>% 
+  # Did remove CBMeterCheck, which is in the Access query. This CB column is a relic of the 20 mm survey that was ported over
   select(Date, Survey, Station, Tow, Duration, 
-         CBMeterCheck, NetMeterCheck, contains("Comments")) %>% 
+         NetMeterCheck, contains("Comments")) %>% 
   mutate(Date = as.Date(Date),
          SeasonYear = year(Date) + (month(Date) > 11),
          Outlier = ifelse((Duration %in% 2.5 & (NetMeterCheck < 2500 | NetMeterCheck > 12000)) |
