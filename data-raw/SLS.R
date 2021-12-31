@@ -185,6 +185,41 @@ readSLSAccess <- function(file = Args[2],
       select(ID, Station, Description, Lat, Long)
   }
   
+  # Round all numeric values to 7 digits...This gets rid of "ghost numbers", as known by Bay Study,
+  # that are caused by the use of "single" field size in Access. When converted to "double"
+  # in R and Excel, the addition of additional decimal points causes non-zero digits to appear
+  # to fill in the missing spaces. This is simply a limitation of computer arithmetics
+  substrRight <- function(x, n) {
+    substr(x, nchar(x) - n + 1, nchar(x))
+    # Function sourced from: https://stackoverflow.com/questions/7963898/extracting-the-last-n-characters-from-a-string-in-r?rq=1
+  }
+  
+  floatIssue <- lapply(SLSTables, function(x) {
+    df <- x %>% 
+      summarise(across(where(is.numeric), 
+                       # Will check for 14 digits, since conversion of "single" to double
+                       ~suppressWarnings(sum(as.numeric(substrRight(sprintf("%.14f", .x), 1)), na.rm = T)))) %>% 
+      select_if(~ !is.numeric(.) || sum(.) != 0) %>% 
+      names()
+  })
+  
+  # Which data frames have this float issue:
+  floatIssueDF <- names(which(sapply(floatIssue, function(x) !identical(x, character(0)))))
+  # Within the affected DFs, round the affected columns to 7 and then 2 digits
+  # I believe the step to round to 7 digits is not needed but does not really affect computational speed
+  # Will leave because mechanically, "single" field size is 7 digits long.
+  
+  for (i in floatIssueDF) {
+    
+    columnsAffected <- floatIssue[[i]]
+    
+    cat("\nColumn(s)", columnsAffected, "in the", i, "DF experienced float issues. Rounding accordingly. \n")
+    
+    SLSTables[[floatIssueDF]] <- SLSTables[[floatIssueDF]] %>% 
+      mutate(across(all_of(columnsAffected), ~round(.x, 7)),
+             across(all_of(columnsAffected), ~round(.x, 2)))
+  }
+  
   # For instances where you do not want to write the rda and want to work 
   # entirely in this environment, returnDF will be used
   
