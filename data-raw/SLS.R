@@ -215,7 +215,7 @@ readSLSAccess <- function(file = Args[2],
     
     cat("\nColumn(s)", columnsAffected, "in the", i, "DF experienced float issues. Rounding accordingly. \n")
     
-    SLSTables[[floatIssueDF]] <- SLSTables[[floatIssueDF]] %>% 
+    SLSTables[[i]] <- SLSTables[[i]] %>% 
       mutate(across(all_of(columnsAffected), ~round(.x, 7)),
              across(all_of(columnsAffected), ~round(.x, 2)))
   }
