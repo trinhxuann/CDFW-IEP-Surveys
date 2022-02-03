@@ -254,6 +254,29 @@ outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, Outlier == 
 
 # Cable outliers ----------------------------------------------------------
 
+# For 20mm, the joining keys are autonumbered ID columns. To get date, the Survey dataset has to be joined.
+# Since this step is repeated before every query, will simply write a short function to join the
+# Survey, Station, and Tow dataframes together
+
+joinSurveyStationTow <- function(skipTow = F) {
+  
+  df <- full_join(data$Survey,
+            data$Station,
+            by = "SurveyID") 
+  
+  if (anyDuplicated(df) != 0) {
+    stop("Join of tables Survey and Station produced duplicated data when it should not.")
+  }
+  
+  if (!skipTow) {
+    # Final step, this will cause duplicates as intended since env data only recorded once per station
+    full_join(df, data$Tow, 
+              by = c("StationID"))
+  } else {
+    df
+  }
+}
+
 # Equivalent to "Edit - Cable Out (outliers)
 
 # What the script does: If CableOut is NOT standard during a tow with bottom depth > 5, return as outlier
@@ -264,13 +287,9 @@ outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, Outlier == 
 # What the script does: For each CableOut, there is a range of accompanying BottomDepth. If outside that combo,
 # return as an outlier
 
-outliers$CableDepth <- full_join(data$Survey,
-                                 data$Station,
-                                 by = "SurveyID") %>% 
-  full_join(data$Tow, 
-            by = c("StationID")) %>% 
+outliers$CableDepth <- joinSurveyStationTow() %>% 
   transmute(Year = year(SampleDate),
-            SampleDate = as.SampleDate(SampleDate),
+            SampleDate = as.Date(SampleDate),
             Survey, Station, TowNum, BottomDepth, CableOut,
             Comments.Station = Comments.y) %>% 
   arrange(SampleDate) %>% 
@@ -291,22 +310,18 @@ outliers$CableDepth <- full_join(data$Survey,
          # Only care about outliers this season
          Year %in% yearOfInterest) %>% 
   arrange(Outlier, SampleDate, Station)
-# Join to the water info table is needed to get "survey"
-# Checked 11-24-21 by TN that this matches the DB query, by summing each column of resulting DF
-# 12-6-21; changing this to Outlier column format == still same output as 11-24-21 BEFORE adding in values with
-# NAFlag; Adding in the NAFlag column will mean the final table will have more flagged values than on 11-24-21 (thus on Access DB)
+
+# Checked by TN 02-01-2022 using Year %in% 2020 (what was already in database); OK
+# Checked against ALL years and CableOut lines up but not BottomDepth. Strange.
+# NOT due to the use of inner_join in the original query vs full here
 
 # Meter readings ----------------------------------------------------------
-
-# ASK ADAM Not a part of 20 mm query DB ####
 
 # Equivalent to "Edit - Meter Reading Out of Range"
 # What the script does: Check values of duration and flow meter readings; those beyond these thresholds
 # are outliers; these values thresholds = field tested
 
-outliers$MeterReading <- full_join(data$Survey, data$Station,
-                                   by = "SurveyID") %>%
-  full_join(data$Tow, by = "StationID") %>% 
+outliers$MeterReading <- joinSurveyStationTow() %>% 
   full_join(data$Gear, by = "TowID") %>% 
   select(SampleDate, ends_with("ID"), Survey, Station, TowNum, Duration, 
          MeterCheck, GearCode, contains("Comments")) %>% 
@@ -318,16 +333,14 @@ outliers$MeterReading <- full_join(data$Survey, data$Station,
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
   arrange(Outlier, SampleDate, Station)
-# Checked 11-24-21 by TN that this matches the DB query, small enough to check that all is equal
-# Checked 12-06-21 by TN that addition of Outlier and NAFlag does not break code
 
-# Equivalent to "Edit - Meter Reading Out of Range"
+# Checked 02-01-22 by TN with original query. across all years
+
+# Equivalent to "Edit - CB Meter Reading Out of Range"
 # What the script does: Check values of duration and flow meter readings; those beyond these thresholds
 # are outliers; these values thresholds = field tested
 
-outliers$CB_MeterReading <- full_join(data$Survey, data$Station,
-                                   by = "SurveyID") %>%
-  full_join(data$Tow, by = "StationID") %>% 
+outliers$CB_MeterReading <- joinSurveyStationTow() %>% 
   full_join(data$Gear, by = "TowID") %>% 
   select(SampleDate, ends_with("ID"), Survey, Station, TowNum, Duration, 
          MeterCheck, GearCode, contains("Comments")) %>% 
@@ -339,15 +352,13 @@ outliers$CB_MeterReading <- full_join(data$Survey, data$Station,
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
   arrange(Outlier, SampleDate, Station)
-# Checked 11-24-21 by TN that this matches the DB query, small enough to check that all is equal
-# Checked 12-06-21 by TN that addition of Outlier and NAFlag does not break code
+
+# Checked 02-01-22 by TN with original query. across all years, OK
 
 # Equivalent to "Edit - Net Meter Serial"
 # plot out flow meter checks, by diff flow meter serials; to determine when a certain flow meter failed during a season
 
-outliers$NetMeterSerial <- full_join(data$Survey, data$Station,
-                                     by = "SurveyID") %>%
-  full_join(data$Tow, by = "StationID") %>% 
+outliers$NetMeterSerial <- joinSurveyStationTow() %>% 
   full_join(data$Gear, by = "TowID") %>% 
   transmute(Year = year(SampleDate), 
             Survey, 
@@ -357,17 +368,15 @@ outliers$NetMeterSerial <- full_join(data$Survey, data$Station,
          Year %in% yearOfInterest) %>% 
   group_by(Year, Survey, MeterSerial, GearCode) %>% 
   count(name = "CountOfMeterSerial")
-# I believe this script is used for other analyses by Native Fishes. Will keep for now
-# Checked 11-24-21 by TN that this matches the DB query, small enough to check that all is equal
+# Checked 02-01-22 by TN with original query. across all years, OK
+
 
 # Equivalent to "Edit - Tow duration (outliers)"
 
 # What the script does: find data points where duration is NOT equal to 2.5, 5, or 10 min; these are
 # the standard tow lengths for this survey
 
-outliers$TowDuration <- full_join(data$Survey, data$Station,
-                                  by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
+outliers$TowDuration <- joinSurveyStationTow() %>% 
   mutate(Year = year(SampleDate),
          Outlier = ifelse(!Duration %in% c(2.5, 5, 10),
                           T, F),
@@ -377,11 +386,9 @@ outliers$TowDuration <- full_join(data$Survey, data$Station,
          TowNum, Duration, contains("Comments"), Outlier, NAFlag) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest)
-# Checked 11-24-21 by TN that this matches the DB query, both queries returned 0 rows
+# Checked 02-01-22 by TN with original query. across all years, OK
 
 # Physical parameters -----------------------------------------------------
-
-# Equivalent to Edit – Bottom Depth III
 
 # What the script does: IMPORTANT: this is applicable to ALL the physical predictors below, so
 # BottomDepth, BottomDepthMonth, Temp, TempMonth, TopEC, TopECMonth, BottomEC, BottomECMonth,
@@ -393,285 +400,361 @@ outliers$TowDuration <- full_join(data$Survey, data$Station,
 # to the general conditions of these predictors across time, e.g., water temperature in Dec will on average
 # be lower than those in March.
 
-outliers$BottomDepth <- full_join(data$Survey, data$Station,
-                                  by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station) %>% 
+# For these scripts, the first part is always to find the mean and stdev of the
+# environmental variable of interest. Since there are 3 tows per lane, there are duplications
+# of these values that is not consistently 3 and can throw off calculations if
+# this isn't accounted for. So, writing a small function here to calculate mean/std
+# of the variable you want without joining to the tow function to avoid duplication problems
+findMeanAndStdev <- function(data, variable, byMonth = F) {
+
+  # This is equivalent to step 1 in the edit queries, finding mean and std of data
+  variable <- enquo(variable)
+
+  if (byMonth) {
+    data %>%
+      group_by(Station, 
+               Month = month(SampleDate)) %>%
+      summarise(Mean = mean(!!variable, na.rm = T),
+                SdTwoDown = Mean - 2 * sd(!!variable, na.rm = T),
+                SdTwoUp = Mean + 2 * sd(!!variable, na.rm = T),
+                .groups = "drop")
+  } else {
+    data %>%
+      group_by(Station) %>%
+      summarise(Mean = mean(!!variable, na.rm = T),
+                SdTwoDown = Mean - 2 * sd(!!variable, na.rm = T),
+                SdTwoUp = Mean + 2 * sd(!!variable, na.rm = T),
+                .groups = "drop")
+  }
+  # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
+}
+
+
+# Each of query is a replication of the access version. As such, what is outputted here should be the same
+# as the Access version; this following function will compare that
+
+checkQueries <- function(rQueryDF, accessQueryName) {
+  
+  rQueryDFCompare <- rQueryDF %>% 
+    filter(Outlier %in% "TRUE") %>% 
+    arrange(SampleDate, Station)
+  
+  accessQueryCompare <- DBI::dbReadTable(name = accessQueryName, conn = con) %>% 
+    filter(Outlier == -1)
+  
+  # For some reason piping these two actions causes significantly longer execution lag...
+  # So will simply separate the scripts
+  # The mean/standard.devations column names differ between the queries...Will have to account for them here
+  
+  if (any(grepl("Standard.Devations", names(accessQueryCompare)))) {
+    accessQueryCompare <- accessQueryCompare %>% 
+      rename(Station = Station.Station,
+             SdTwoDown = X2...Standard.Devations,
+             SdTwoUp = X2...Standard.Devations.1) %>% 
+      arrange(SampleDate, Station) %>% 
+      mutate(Outlier = ifelse(Outlier == -1, T, F))
+  } else {
+    
+    nameOfMeanVariable <- names(accessQueryCompare)[which(grepl("Avg", names(accessQueryCompare)))]
+    
+    accessQueryCompare <- accessQueryCompare %>% 
+      rename(Station = Station.Station,
+             Mean = all_of(nameOfMeanVariable),
+             SdTwoDown = Lower.Bound,
+             SdTwoUp = Upper.Bound) %>% 
+      arrange(SampleDate, Station) %>% 
+      mutate(Outlier = ifelse(Outlier == -1, T, F))
+  }
+  
+  namesCompare <- names(rQueryDFCompare)[names(rQueryDFCompare) %in% names(accessQueryCompare)]
+  
+  compare <- all.equal(rQueryDFCompare %>% 
+                         select(namesCompare),
+                       accessQueryCompare %>% 
+                         select(namesCompare))
+  
+  if (!isTRUE(compare)) {
+    print(compare)
+    warning("The two queries are not the same.")
+    browser()
+  }
+  
+  cat("Check complete. The two queries are the same. \n")
+  T
+}
+
+# Empty check list to make sure that the outputted query in R is producing the same as in Access
+checks <- list()
+# IMPORTANT NOTE: this checkQueries function is performed on the rQuery that is BEFORE joining the Tow
+# data table. After joining, data is duplicated for the 20 mm. So, the FINAL output of the queries
+# built in R will NOT be the same as the ones in Access since the Access ones do not 
+
+# Equivalent to "Edit - Bottom Depth (outliers)"
+
+outliers$BottomDepth <- joinSurveyStationTow() %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(), 
+                             variable = BottomDepth),
+            by = "Station") %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanBottomDepth = mean(BottomDepth, na.rm = T),
-         sd2down = meanBottomDepth - 2 * sd(BottomDepth, na.rm = T),
-         sd2up = meanBottomDepth + 2 * sd(BottomDepth, na.rm = T),
-         # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
          # This is part 2 of the query
-         Outlier = ifelse((BottomDepth < sd2down | BottomDepth > sd2up), T, F),
+         Outlier = ifelse((BottomDepth < SdTwoDown | BottomDepth > SdTwoUp), T, F),
          # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(BottomDepth), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
   # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
-  select(SampleDate, ends_with("ID"), Year, Station, BottomDepth, meanBottomDepth, sd2down, sd2up, 
+  select(SampleDate, SurveyID, StationID, Year, Station, BottomDepth, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
-# Checked 11-24-21 by TN that this matches the DB query, summation of the numeric columns equal
+
+checks$BottomDepth <- checkQueries(outliers$BottomDepth, "Edit - Bottom Depth (outliers)")
 
 # BottomDepthMonth
 
-outliers$BottomDepthMonth <- full_join(data$Survey, data$Station,
-                                       by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station, Month = month(SampleDate)) %>% 
+outliers$BottomDepthMonth <- joinSurveyStationTow() %>% 
+  mutate(Month = month(SampleDate)) %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(), 
+                             variable = BottomDepth,
+                             byMonth = T),
+            by = c("Station", "Month")) %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanBottomDepth = mean(BottomDepth, na.rm = T),
-         sd2down = meanBottomDepth - 2 * sd(BottomDepth, na.rm = T),
-         sd2up = meanBottomDepth + 2 * sd(BottomDepth, na.rm = T),
-         # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
          # This is part 2 of the query
-         Outlier = ifelse((BottomDepth < sd2down | BottomDepth > sd2up), T, F),
+         Outlier = ifelse((BottomDepth < SdTwoDown | BottomDepth > SdTwoUp), T, F),
          # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(BottomDepth), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
   # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
-  select(SampleDate, ends_with("ID"), Year, Month,
-         Station, BottomDepth, meanBottomDepth, sd2down, sd2up, 
+  select(SampleDate, SurveyID, StationID, Year, Month, Station, BottomDepth, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
-# Edit – Temp III
-outliers$Temp <- full_join(data$Survey, data$Station,
-                           by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station) %>% 
+# Edit - Temp (outliers)
+outliers$Temp <- joinSurveyStationTow() %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = Temp),
+            by = "Station") %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanTemp = mean(Temp, na.rm = T),
-         sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-         sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
+         Outlier = ifelse((Temp < SdTwoDown | Temp > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(Temp), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"), Year, Station, Temp, meanTemp, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Station, Temp, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
+
+checks$Temp <- checkQueries(outliers$Temp, "Edit - Temp (outliers)")
+
+# IMPORTANT: FIX THE DUMB ROUNDING ISSUE DUE TO SINGLES
 
 # TempMonth
-outliers$TempMonth <- full_join(data$Survey, data$Station,
-                                by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station, Month = month(SampleDate)) %>% 
+outliers$TempMonth <- joinSurveyStationTow() %>% 
+  mutate(Month = month(SampleDate)) %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = Temp,
+                             byMonth = T),
+            by = c("Station", "Month")) %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanTemp = mean(Temp, na.rm = T),
-         sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-         sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
+         Outlier = ifelse((Temp < SdTwoDown | Temp > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(Temp), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"), Year, Month,
-         Station, Temp, meanTemp, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Month, Station, Temp, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
-# Edit – Top EC III
-outliers$TopEC <- full_join(data$Survey, data$Station,
-                            by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station) %>% 
+# Edit - Top EC (outliers)
+outliers$TopEC <- joinSurveyStationTow() %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = TopEC),
+            by = "Station") %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanTopEC = mean(TopEC, na.rm = T),
-         sd2down = meanTopEC - 2 * sd(TopEC, na.rm = T),
-         sd2up = meanTopEC + 2 * sd(TopEC, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((TopEC < sd2down | TopEC > sd2up), T, F),
+         Outlier = ifelse((TopEC < SdTwoDown | TopEC > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(TopEC), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"),
-         Year, Station, TopEC, meanTopEC, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Station, TopEC, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
+
+checks$TopEC <- checkQueries(outliers$TopEC, "Edit - Top EC (outliers)")
 
 # TopECMonth
-outliers$TopECMonth <- full_join(data$Survey, data$Station,
-                                 by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station, Month = month(SampleDate)) %>% 
+outliers$TopECMonth <- joinSurveyStationTow() %>% 
+  mutate(Month = month(SampleDate)) %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = TopEC,
+                             byMonth = T),
+            by = c("Station", "Month")) %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanTopEC = mean(TopEC, na.rm = T),
-         sd2down = meanTopEC - 2 * sd(TopEC, na.rm = T),
-         sd2up = meanTopEC + 2 * sd(TopEC, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((TopEC < sd2down | TopEC > sd2up), T, F),
+         Outlier = ifelse((TopEC < SdTwoDown | TopEC > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(TopEC), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"),
-         Year, Month, Station, TopEC, meanTopEC, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Month, Station, TopEC, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
 # Edit – Bottom EC III
-outliers$BottomEC <- full_join(data$Survey, data$Station,
-                               by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station) %>% 
+outliers$BottomEC <- joinSurveyStationTow() %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = BottomEC),
+            by = "Station") %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanBottomEC = mean(BottomEC, na.rm = T),
-         sd2down = meanBottomEC - 2 * sd(BottomEC, na.rm = T),
-         sd2up = meanBottomEC + 2 * sd(BottomEC, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((BottomEC < sd2down | BottomEC > sd2up), T, F),
+         Outlier = ifelse((BottomEC < SdTwoDown | BottomEC > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(BottomEC), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"),
-         Year, Station, BottomEC, meanBottomEC, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Station, BottomEC, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
+checks$BottomEC <- checkQueries(outliers$BottomEC, "Edit - Bottom EC (outliers)")
+
 # BottomECMonth
-outliers$BottomECMonth <- full_join(data$Survey, data$Station,
-                                    by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station, Month = month(SampleDate)) %>% 
+outliers$BottomECMonth <- joinSurveyStationTow() %>% 
+  mutate(Month = month(SampleDate)) %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = BottomEC,
+                             byMonth = T),
+            by = c("Station", "Month")) %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanBottomEC = mean(BottomEC, na.rm = T),
-         sd2down = meanBottomEC - 2 * sd(BottomEC, na.rm = T),
-         sd2up = meanBottomEC + 2 * sd(BottomEC, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((BottomEC < sd2down | BottomEC > sd2up), T, F),
+         Outlier = ifelse((BottomEC < SdTwoDown | BottomEC > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(BottomEC), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"), 
-         Year, Month, Station, BottomEC, meanBottomEC, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Month, Station, BottomEC, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
 # Edit – Secchi III
-outliers$Secchi <- full_join(data$Survey, data$Station,
-                             by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station) %>% 
+outliers$Secchi <- joinSurveyStationTow() %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = Secchi),
+            by = "Station") %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanSecchi = mean(Secchi, na.rm = T),
-         sd2down = meanSecchi - 2 * sd(Secchi, na.rm = T),
-         sd2up = meanSecchi + 2 * sd(Secchi, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Secchi < sd2down | Secchi > sd2up), T, F),
+         Outlier = ifelse((Secchi < SdTwoDown | Secchi > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(Secchi), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"), 
-         Year, Station, Secchi, meanSecchi, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Station, Secchi, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
+
+checks$Secchi <- checkQueries(outliers$Secchi, "Edit - Secchi (outliers)")
 
 # SecchiMonth
-outliers$SecchiMonth <- full_join(data$Survey, data$Station,
-                                  by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station, Month = month(SampleDate)) %>% 
+outliers$SecchiMonth <- joinSurveyStationTow() %>% 
+  mutate(Month = month(SampleDate)) %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = Secchi,
+                             byMonth = T),
+            by = c("Station", "Month")) %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanSecchi = mean(Secchi, na.rm = T),
-         sd2down = meanSecchi - 2 * sd(Secchi, na.rm = T),
-         sd2up = meanSecchi + 2 * sd(Secchi, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Secchi < sd2down | Secchi > sd2up), T, F),
+         Outlier = ifelse((Secchi < SdTwoDown | Secchi > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(Secchi), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"), 
-         Year, Month, Station, Secchi, meanSecchi, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Month, Station, Secchi, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
-# Edit – Turbidity III
-outliers$Turbidity <- full_join(data$Survey, data$Station,
-                                by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station) %>% 
+# There is no equivalent Turbidity script in Access for 20 mm
+outliers$Turbidity <- joinSurveyStationTow() %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = Turbidity),
+            by = "Station") %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanTurbidity = mean(Turbidity, na.rm = T),
-         sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
-         sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up), T, F),
+         Outlier = ifelse((Turbidity < SdTwoDown | Turbidity > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"),
-         Year, Station, Turbidity, meanTurbidity, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Station, Turbidity, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
+
+# checks$Turbidity <- checkQueries(outliers$Turbidity, "Edit - Turbidity (outliers)")
 
 # TurbidityMonth
-outliers$TurbidityMonth <- full_join(data$Survey, data$Station,
-                                     by = "SurveyID") %>% 
-  full_join(data$Tow, by = "StationID") %>% 
-  group_by(Station, Month = month(SampleDate)) %>% 
+outliers$TurbidityMonth <- joinSurveyStationTow() %>% 
+  mutate(Month = month(SampleDate)) %>% 
+  full_join(findMeanAndStdev(joinSurveyStationTow(skipTow = T), 
+                             variable = Turbidity,
+                             byMonth = T),
+            by = c("Station", "Month")) %>% 
   mutate(Year = year(SampleDate),
-         # This is part 1 of the query
-         meanTurbidity = mean(Turbidity, na.rm = T),
-         sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
-         sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up), T, F),
+         Outlier = ifelse((Turbidity < SdTwoDown | Turbidity > SdTwoUp), T, F),
+         # This is new to the code; will create a column that flags NAs and those will also be returned
          NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
-  arrange(SampleDate) %>% 
   # This is part 3 of the query
-  select(SampleDate, ends_with("ID"),
-         Year, Month, Station, Turbidity, meanTurbidity, sd2down, sd2up, 
+  # Note that the Comments column from the table is preserved here; this is useful for diagnosing the NAFlag column
+  select(SampleDate, SurveyID, StationID, Year, Month, Station, Turbidity, 
+         Mean, SdTwoDown, SdTwoUp, 
          contains("Comments"), Outlier, NAFlag) %>% 
-  mutate(SampleDate = as.Date(SampleDate)) %>% 
   filter(Outlier == T | NAFlag == T,
          Year %in% yearOfInterest) %>% 
+  distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
 # Various plots for station vs station/months -----------------------------
@@ -775,10 +858,12 @@ outliers$TurbidityMonth <- full_join(data$Survey, data$Station,
 
 # This is a temp name
 # Adding the 3 columns that Adam requested for the ES in charge to fill in to document result of analysis
-saveSheet <- lapply(outliers, function(x) mutate(x, IsOutlier = NA, ChangedTo = NA, CommentsOutlier = NA,
+saveSheet <- lapply(outliers, function(x) mutate(x, 
+                                                 SampleDate = as.Date(SampleDate),
+                                                 IsOutlier = NA, ChangedTo = NA, CommentsOutlier = NA,
                                                  # Strange XML character in some rows of the comments column in the
                                                  # Water Info table; removing this so that the excel file saves correctly
                                                  across(where(is.character), ~str_replace_all(.x, "\uFFFD", ""))))
 
 # Saving the file; this will save to the current directory, which by default is in the parent folder; will change this later
-writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "SLS", paste0("SLS_outliers_", today(), ".xlsx")))
+writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "20mm", paste0("20mm_outliers_", today(), ".xlsx")))
