@@ -220,7 +220,7 @@ readSLSAccess <- function(file = Args[2],
              across(all_of(columnsAffected), ~round(.x, 2)))
   }
   
-  # For instances where you do not want to write the rda and want to work 
+  # For instances where you do not want to write the rds and want to work 
   # entirely in this environment, returnDF will be used
   
   if (returnDF) {
@@ -229,7 +229,7 @@ readSLSAccess <- function(file = Args[2],
     return(SLSTables)
     
   } else {
-    # If not returning the df, will return BOTH the csv files AND RDA file
+    # If not returning the df, will return BOTH the csv files AND RDS file
     
     cat("Exporting csv flat files \n")
     
@@ -263,8 +263,8 @@ readSLSAccess <- function(file = Args[2],
     saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rds"),
             compress = T)
     
-    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rds"))) cat("RDA file created successfully  \n")
-    else (stop("RDA file was NOT created, something failed!"))
+    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rds"))) cat("RDS file created successfully  \n")
+    else (stop("RDS file was NOT created, something failed!"))
   }
   cat("\nDone! \n")
 }
