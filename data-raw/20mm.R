@@ -69,14 +69,9 @@ download20mm <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20S
                 mode = "wb")
 }
 
-# Function to start reading data from Access directly
-read20mmAccess <- function(file = Args[2],
+connectAccess <- function(file = Args[2],
                           exdir = tempdir(),
-                          surveyName = "20mm",
-                          returnDF = F,
-                          tablesReturned = Args[-(1:2)]) {
-
-  cat("\nConnecting to Access \n")
+                          surveyName = "20mm") {
   
   # In order to use this correctly, you need to have the 32-bit version of R installed
   # This function is used with system() below to create an rds file 
@@ -111,6 +106,20 @@ read20mmAccess <- function(file = Args[2],
                       message(cond)
                     }
                   })
+}
+
+# Function to start reading data from Access directly
+read20mmAccess <- function(surveyName = "20mm",
+                           returnDF = F,
+                          tablesReturned = Args[-(1:2)]) {
+  pb <- txtProgressBar(min = 0, max = 5, style = 3)
+  startTime <- Sys.time()
+  cat("\nConnecting to Access \n")
+  
+  con <- connectAccess()
+  
+  setTxtProgressBar(pb, 1)
+  connectionTime <- Sys.time()
   
   # Pulling just the table names to be used in mapply() below
   tableNames <- odbc::dbListTables(conn = con)
@@ -125,7 +134,7 @@ read20mmAccess <- function(file = Args[2],
     return(tableNames)
   }
   
-  cat("Pulling tables:", tablesReturned, "\n")
+  cat("\n", paste0("Pulling (", length(tablesReturned), ") tables: "), paste(tablesReturned, collapse = ", "), fill = T)
   
   # Apply the dbReadTable to each readable table in db
   TTmmTables <- mapply(DBI::dbReadTable,
@@ -170,20 +179,69 @@ read20mmAccess <- function(file = Args[2],
   # FishSample ok
   # FishLength ok
   
-  ##### IMPORTANT: Need to still fix the "ghost numbers"
+  setTxtProgressBar(pb, 2)
+  pullTime <- Sys.time()
   
+  # Round all numeric values to 7 digits...This gets rid of "ghost numbers", as known by Bay Study,
+  # that are caused by the use of "single" field size in Access. When converted to "double"
+  # in R and Excel, the addition of additional decimal points causes non-zero digits to appear
+  # to fill in the missing spaces. This is simply a limitation of computer arithmetics
+  substrRight <- function(x, n) {
+    substr(x, nchar(x) - n + 1, nchar(x))
+    # Function sourced from: https://stackoverflow.com/questions/7963898/extracting-the-last-n-characters-from-a-string-in-r?rq=1
+  }
+  
+  cat("\nChecking for float issues.", fill = T)
+  
+  floatIssue <- lapply(TTmmTables, function(x) {
+    df <- x %>% 
+      summarise(across(where(is.numeric), 
+                       # Will check for 14 digits, since conversion of "single" to double
+                       ~suppressWarnings(sum(as.numeric(substrRight(sprintf("%.14f", .x), 1)), na.rm = T)))) %>% 
+      select_if(~ !is.numeric(.) || sum(.) != 0) %>% 
+      names()
+  })
+  
+  # Which data frames have this float issue:
+  floatIssueDF <- names(which(sapply(floatIssue, function(x) !identical(x, character(0)))))
+  # Within the affected DFs, round the affected columns to 7 and then 2 digits
+  # I believe the step to round to 7 digits is not needed but does not really affect computational speed
+  # Will leave because mechanically, "single" field size is 7 digits long.
+  
+  for (i in floatIssueDF) {
+    
+    columnsAffected <- floatIssue[[i]]
+    
+    cat("Column(s)", paste(columnsAffected, collapse = ", "), "in the", i, "data table experienced float issues. Rounding accordingly.", fill = T)
+    
+    TTmmTables[[i]] <- TTmmTables[[i]] %>% 
+      mutate(across(all_of(columnsAffected), ~round(.x, 7)),
+             across(all_of(columnsAffected), ~round(.x, 2)))
+  }
+  
+  setTxtProgressBar(pb, 3)
+  floatTime <- Sys.time()
   # For instances where you do not want to write the rds and want to work 
   # entirely in this environment, returnDF will be used
   
   if (returnDF) {
     
-    cat("Returning dataframe only \n")
+    cat("\nReturning dataframe only \n")
+    setTxtProgressBar(pb, 5)
+    close(pb)
+    endTime <- Sys.time()
+    
+    cat("Connection time: ", (connectionTime - startTime)/60, 
+        "; pull time: ", (pullTime - connectionTime)/60,
+        "; float time: ", (floatTime - pullTime)/60,
+        "; overall time: ", (connectionTime - floatTime)/60, " seconds.", fill = T)
+    
     return(TTmmTables)
     
   } else {
     # If not returning the df, will return BOTH the csv files AND RDA file
     
-    cat("Exporting csv flat files \n")
+    cat("\nExporting csv flat files \n")
     
     writeFiles <- sapply(seq_along(TTmmTables), function(i) {
       
@@ -198,6 +256,9 @@ read20mmAccess <- function(file = Args[2],
       file.exists(filePath)
     })
     
+    setTxtProgressBar(pb, 4)
+    writeTime <- Sys.time()
+    
     if (!all(writeFiles)) {
       df <- data.frame(tableNames = tableNames,
                        fileFailed = !writeFiles)
@@ -207,7 +268,7 @@ read20mmAccess <- function(file = Args[2],
            paste0(length(errors), " out of ", length(df$tableNames), " tables \n"),
            paste0(errors, "\n"), call. = F)
     } else {
-      cat("All tables exported successfully \n")
+      cat("\nAll tables exported successfully \n")
     }
     cat("Exporting rds file \n")
     
@@ -215,10 +276,22 @@ read20mmAccess <- function(file = Args[2],
     saveRDS(TTmmTables, file = file.path("data-raw", surveyName, "TTmmTables.rds"),
             compress = T)
     
-    if (file.exists(file.path("data-raw", surveyName, "TTmmTables.rds"))) cat("RDA file created successfully  \n")
-    else (stop("RDA file was NOT created, something failed!"))
+    setTxtProgressBar(pb, 5)
+    saveTime <- Sys.time()
+    
+    if (file.exists(file.path("data-raw", surveyName, "TTmmTables.rds"))) cat("\nRDA file created successfully  \n")
+    else (stop("\nRDA file was NOT created, something failed!"))
   }
-  cat("\nDone! \n")
+  close(pb)
+  endTime <- Sys.time()
+  cat("Done! \n")
+  
+  cat(paste0("Connection time: ", round(as.numeric(connectionTime - startTime, units = "secs"), 1), 
+             "; pull time: ", round(as.numeric(pullTime - connectionTime, units = "secs"), 1),
+             "; float time: ", round(as.numeric(floatTime - pullTime, units = "secs"), 1),
+             "; write time: ", round(as.numeric(writeTime - floatTime, units = "secs"), 1),
+             "; save time: ", round(as.numeric(saveTime - writeTime, units = "secs"), 1),
+             "; overall time: ", round(as.numeric(endTime - startTime, units = "secs"), 1), " seconds."), fill = T)
 }
 
 # # Run the functions to download and read the database

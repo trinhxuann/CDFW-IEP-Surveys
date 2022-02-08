@@ -23,12 +23,13 @@ outliers <- list()
 # the current season. Currently, the season for 20 mm spans from Mar to ~July
 # Also adding a second requirement that the latest data entry is later than Mar of current year
 
-yearOfInterest <- (year(today()) - 1) + (month(today()) > 3 & max(data$Survey$SampleDate) > as.SampleDate(paste0(year(today()), "-03-01")))
+yearOfInterest <- (year(today()) - 1) + (month(today()) > 3 & max(data$Survey$SampleDate) > as.Date(paste0(year(today()), "-03-01")))
 
 # Make sure that the file names/table names are the same as what will be called here. They NEED to be:
 # "Catch", "Lengths", "MeterCorrections", "Station_Lookup", "TowInfo", and "WaterInfo"
 # Order of names listed in expectedNames variable does not matter
-expectedNames <- c("Catch", "Lengths", "MeterCorrections", "TowInfo", "WaterInfo", "Station_Lookup")
+expectedNames <- list.files(file.path("data-raw", "20mm"), pattern = "*.csv") %>% 
+  gsub(".csv", "", .)
 
 if (!all(names(data) %in% expectedNames)) {
   stop("Table name(s) ", shQuote(names(data)[which(!names(data) %in% expectedNames)]),
@@ -119,13 +120,11 @@ plotGPS <- function(df, station = NULL, Year = NULL, ...) {
 }
 
 
-# Example: this plots ALL stations across a year of interest; Year can be left blank if
-# you want all stations across all years plotted (will be slow though)
-# 2001 looks good
-plotGPS(GPSDF, Year = 2021, title = "Source")
-plotGPS(GPSDF, Year = 2021, station = 809, title = "Source")
-
-# Use findOutlierGPS after running plotGPS and visually determining which stations/year may have 
+# # Example: this plots ALL stations across a year of interest; Year can be left blank if
+# # you want all stations across all years plotted (will be slow though)
+# # 2001 looks good
+# plotGPS(GPSDF, Year = 2021, title = "Source")
+# plotGPS(GPSDF, Year = 2021, station = 809, title = "Source")
 
 # Finding distance to run the clustering analysis on
 # Function taken from https://stackoverflow.com/questions/21095643/approaches-for-spatial-geodesic-latitude-longitude-clustering-in-r-with-geodesic
@@ -198,7 +197,6 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
 }
 
 # Edit – GPS Coordinates
-# These are stations that I see that may be outlying across ALL years; 
 # IMPORTANT:
 # k was chosen after visual inspection of the produced dendogram
 # print = F used AFTER confirming with the visualizations that this is what you want
@@ -207,15 +205,16 @@ GPSOutlying <- list()
 # Example:
 # GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022)
 
-# Might be useful to plot all years data for the particular station of interest?
-# Here are 4 stations that are grossly outlier when plotting the entire dataset
-# Note all k = 3 but that's just coincidence
-findOutlierGPS(GPSDF, station = 323)
-findOutlierGPS(GPSDF, station = 323, k = 3)
-
-findOutlierGPS(GPSDF, station = 812, k = 3)
-findOutlierGPS(GPSDF, station = 340, k = 3)
-findOutlierGPS(GPSDF, station = 719, k = 3)
+# # Might be useful to plot all years data for the particular station of interest?
+# # Example of workflow through this function:
+# # Here are 4 stations that are grossly outlier when plotting the entire dataset
+# # Note all k = 3 but that's just coincidence
+# findOutlierGPS(GPSDF, station = 323)
+# findOutlierGPS(GPSDF, station = 323, k = 3)
+# 
+# findOutlierGPS(GPSDF, station = 812, k = 3)
+# findOutlierGPS(GPSDF, station = 340, k = 3)
+# findOutlierGPS(GPSDF, station = 719, k = 3)
 
 # Now placing them into outlier table to be exported later
 GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 323, k = 3, print = F)
@@ -277,12 +276,151 @@ joinSurveyStationTow <- function(skipTow = F) {
   }
 }
 
+# Each of query is a replication of the access version. As such, what is outputted here should be the same
+# as the Access version; this following function will compare that
+# Need to be connected to access for this
+
+connectAccess <- function(file,
+                          exdir = tempdir(),
+                          surveyName = "20mm") {
+  
+  if (exists("con")) {
+    test <- try(dbIsValid(con))
+    
+    if (!inherits(test, "try-error")) {
+      warning("Access connection already established", call. = F)
+      return()
+    }
+  }
+  
+  # In order to use this correctly, you need to have the 32-bit version of R installed
+  # This function is used with system() below to create an rds file 
+  # required by the rest of the script
+  
+  # If the download20mm() function was used to download the 20mm files, then it will be stored in the 
+  # temp directory, of which will pull here
+  if (is.na(file) | file == shQuote("NA") | file == "NA") {
+    tempFile <- list.files(tempdir())[grep(paste0(surveyName, "*.+zip"), list.files(tempdir()))]
+    
+    # Extracting the downloaded file from download20mm()
+    if (grepl(".zip", tempFile)) {
+      localDbFile <- unzip(zipfile = file.path(exdir, tempFile), exdir = exdir)
+    }
+  } else {
+    localDbFile <- file
+    
+    if (!file.exists(localDbFile)) stop("File path not found. Did you specify right? Are you on VPN?", call. = F)
+  }
+  
+  # Driver and path required to connect from RStudio to Access
+  dbString <- paste0("Driver={Microsoft Access Driver (*.mdb, *.accdb)};",
+                     "Dbq=", localDbFile)
+  
+  # Connection variable itself
+  con <- tryCatch(DBI::dbConnect(drv = odbc::odbc(), .connection_string = dbString),
+                  error = function(cond) {
+                    if (all(stringr::str_detect(cond$message, c("IM002", "ODBC Driver Manager")))) {
+                      message(cond, "\n")
+                      message("IM002 and ODBC Driver Manager error generally means a 32-bit R needs to be installed or used.")
+                    } else {
+                      message(cond)
+                    }
+                  })
+}
+
+con <- connectAccess("U:\\NativeFish\\SmeltData\\DS-DATA\\20-mm local\\20-mm_FishZooData_Backup.accdb")
+
+checkQueries <- function(rQueryDF, accessQueryName, conn = con,
+                         meanVar, sdDownName, sdUpName) {
+  
+  accessQueryCompare <- DBI::dbReadTable(name = accessQueryName, conn = conn)
+  
+  if (any(names(accessQueryCompare) %in% "Outlier")) {
+    if (any(c(missing(meanVar), missing(sdDownName), missing(sdUpName)))) {
+      message("Specify meanVar, sdDownName, sdUpName arguments: \n")
+    
+      return(print(names(accessQueryCompare)))
+    }
+    
+    
+    
+    accessQueryCompare <- accessQueryCompare %>% 
+      filter(Outlier == -1) %>% 
+      rename(Station = Station.Station,
+             Mean = sym(meanVar),
+             SdTwoDown = sym(sdDownName),
+             SdTwoUp = sym(sdUpName)) %>%
+      mutate(Outlier = ifelse(Outlier == -1, T, F))
+  } 
+  
+  if (any(names(rQueryDF) %in% "Outlier")) {
+    rQueryDFCompare <- rQueryDF %>% 
+      filter(Outlier %in% "TRUE")
+  } else {
+    rQueryDFCompare <- rQueryDF
+  }
+  
+  # mutate(SampleDate = as.Date(SampleDate))
+  # else {
+  #   accessQueryCompare <- accessQueryCompare %>% 
+  #     arrange(SampleDate, Station)
+  # }
+  
+  # rQueryDFCompare <- rQueryDF %>% 
+  #   filter(Outlier %in% "TRUE")
+  
+  if (any(names(accessQueryCompare) %in% "SampleDate")) {
+    accessQueryCompare <- accessQueryCompare %>% 
+      mutate(SampleDate = as.Date(SampleDate)) %>% 
+      arrange(SampleDate, Station)
+    
+    rQueryDFCompare <- rQueryDFCompare %>% 
+      mutate(SampleDate = as.Date(SampleDate)) %>% 
+      arrange(SampleDate, Station)
+  }
+    
+  if (any(names(rQueryDFCompare) %in% c("Comments.x", "Comments.y"))) {
+    
+    commentVector <- syms(names(select(rQueryDFCompare, contains("Comments"))))
+    
+    rQueryDFCompare <- rQueryDFCompare %>% 
+      unite("Comments", !!!commentVector, sep = "") %>%
+      mutate(Comments = gsub("NA", "", Comments),
+             Comments = ifelse(Comments %in% "", NA_character_, Comments))
+  }
+  
+  namesCompare <- names(rQueryDFCompare)[names(rQueryDFCompare) %in% names(accessQueryCompare)]
+  
+  compare <- all.equal(rQueryDFCompare %>% 
+                         select(namesCompare) %>% 
+                         data.frame(),
+                       accessQueryCompare %>% 
+                         select(namesCompare) %>% 
+                         data.frame(),
+                       # NOTE: this tolerance is here because of single -> double conversion float issue
+                       # The diff between single and double = 7 vs 14 digits
+                       tolerance = 1e-7)
+  
+  if (!isTRUE(compare)) {
+    print(compare)
+    warning("The two queries are not the same.")
+    browser()
+  }
+  
+  cat("Check complete. The two queries are the same. \n")
+  T
+}
+
+# IMPORTANT NOTE: this checkQueries function is performed on the rQuery that is BEFORE joining the Tow
+# data table. After joining, data is duplicated for the 20 mm. So, the FINAL output of the queries
+# built in R will NOT be the same as the ones in Access since the Access ones do not 
+
 # Equivalent to "Edit - Cable Out (outliers)
 
 # What the script does: If CableOut is NOT standard during a tow with bottom depth > 5, return as outlier
 # Removing this entire query as it is redundant compared to the Cable out VS depth query (approved by Adam)
 
-# Equivalent to "Edit - Cable out VS depth"
+# Equivalent to "Edit - Cable out vs Depth"
 
 # What the script does: For each CableOut, there is a range of accompanying BottomDepth. If outside that combo,
 # return as an outlier
@@ -311,13 +449,9 @@ outliers$CableDepth <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   arrange(Outlier, SampleDate, Station)
 
-# Checked by TN 02-01-2022 using Year %in% 2020 (what was already in database); OK
-# Checked against ALL years and CableOut lines up but not BottomDepth. Strange.
-# NOT due to the use of inner_join in the original query vs full here
-
 # Meter readings ----------------------------------------------------------
 
-# Equivalent to "Edit - Meter Reading Out of Range"
+# Equivalent to "Edit - Net meter reading out of range"
 # What the script does: Check values of duration and flow meter readings; those beyond these thresholds
 # are outliers; these values thresholds = field tested
 
@@ -334,9 +468,7 @@ outliers$MeterReading <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   arrange(Outlier, SampleDate, Station)
 
-# Checked 02-01-22 by TN with original query. across all years
-
-# Equivalent to "Edit - CB Meter Reading Out of Range"
+# Equivalent to "Edit - CB meter out of range"
 # What the script does: Check values of duration and flow meter readings; those beyond these thresholds
 # are outliers; these values thresholds = field tested
 
@@ -353,8 +485,6 @@ outliers$CB_MeterReading <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   arrange(Outlier, SampleDate, Station)
 
-# Checked 02-01-22 by TN with original query. across all years, OK
-
 # Equivalent to "Edit - Net Meter Serial"
 # plot out flow meter checks, by diff flow meter serials; to determine when a certain flow meter failed during a season
 
@@ -368,8 +498,6 @@ outliers$NetMeterSerial <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   group_by(Year, Survey, MeterSerial, GearCode) %>% 
   count(name = "CountOfMeterSerial")
-# Checked 02-01-22 by TN with original query. across all years, OK
-
 
 # Equivalent to "Edit - Tow duration (outliers)"
 
@@ -429,66 +557,6 @@ findMeanAndStdev <- function(data, variable, byMonth = F) {
   # countStation = n(), # Removing this portion of the code; it is a part of query 1 but not used elsewhere
 }
 
-
-# Each of query is a replication of the access version. As such, what is outputted here should be the same
-# as the Access version; this following function will compare that
-
-checkQueries <- function(rQueryDF, accessQueryName) {
-  
-  rQueryDFCompare <- rQueryDF %>% 
-    filter(Outlier %in% "TRUE") %>% 
-    arrange(SampleDate, Station)
-  
-  accessQueryCompare <- DBI::dbReadTable(name = accessQueryName, conn = con) %>% 
-    filter(Outlier == -1)
-  
-  # For some reason piping these two actions causes significantly longer execution lag...
-  # So will simply separate the scripts
-  # The mean/standard.devations column names differ between the queries...Will have to account for them here
-  
-  if (any(grepl("Standard.Devations", names(accessQueryCompare)))) {
-    accessQueryCompare <- accessQueryCompare %>% 
-      rename(Station = Station.Station,
-             SdTwoDown = X2...Standard.Devations,
-             SdTwoUp = X2...Standard.Devations.1) %>% 
-      arrange(SampleDate, Station) %>% 
-      mutate(Outlier = ifelse(Outlier == -1, T, F))
-  } else {
-    
-    nameOfMeanVariable <- names(accessQueryCompare)[which(grepl("Avg", names(accessQueryCompare)))]
-    
-    accessQueryCompare <- accessQueryCompare %>% 
-      rename(Station = Station.Station,
-             Mean = all_of(nameOfMeanVariable),
-             SdTwoDown = Lower.Bound,
-             SdTwoUp = Upper.Bound) %>% 
-      arrange(SampleDate, Station) %>% 
-      mutate(Outlier = ifelse(Outlier == -1, T, F))
-  }
-  
-  namesCompare <- names(rQueryDFCompare)[names(rQueryDFCompare) %in% names(accessQueryCompare)]
-  
-  compare <- all.equal(rQueryDFCompare %>% 
-                         select(namesCompare),
-                       accessQueryCompare %>% 
-                         select(namesCompare))
-  
-  if (!isTRUE(compare)) {
-    print(compare)
-    warning("The two queries are not the same.")
-    browser()
-  }
-  
-  cat("Check complete. The two queries are the same. \n")
-  T
-}
-
-# Empty check list to make sure that the outputted query in R is producing the same as in Access
-checks <- list()
-# IMPORTANT NOTE: this checkQueries function is performed on the rQuery that is BEFORE joining the Tow
-# data table. After joining, data is duplicated for the 20 mm. So, the FINAL output of the queries
-# built in R will NOT be the same as the ones in Access since the Access ones do not 
-
 # Equivalent to "Edit - Bottom Depth (outliers)"
 
 outliers$BottomDepth <- joinSurveyStationTow() %>% 
@@ -509,9 +577,6 @@ outliers$BottomDepth <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
-
-checks$BottomDepth <- checkQueries(outliers$BottomDepth, "Edit - Bottom Depth (outliers)")
-
 # BottomDepthMonth
 
 outliers$BottomDepthMonth <- joinSurveyStationTow() %>% 
@@ -555,10 +620,6 @@ outliers$Temp <- joinSurveyStationTow() %>%
   distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
-checks$Temp <- checkQueries(outliers$Temp, "Edit - Temp (outliers)")
-
-# IMPORTANT: FIX THE DUMB ROUNDING ISSUE DUE TO SINGLES
-
 # TempMonth
 outliers$TempMonth <- joinSurveyStationTow() %>% 
   mutate(Month = month(SampleDate)) %>% 
@@ -600,8 +661,6 @@ outliers$TopEC <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
-
-checks$TopEC <- checkQueries(outliers$TopEC, "Edit - Top EC (outliers)")
 
 # TopECMonth
 outliers$TopECMonth <- joinSurveyStationTow() %>% 
@@ -645,8 +704,6 @@ outliers$BottomEC <- joinSurveyStationTow() %>%
   distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
-checks$BottomEC <- checkQueries(outliers$BottomEC, "Edit - Bottom EC (outliers)")
-
 # BottomECMonth
 outliers$BottomECMonth <- joinSurveyStationTow() %>% 
   mutate(Month = month(SampleDate)) %>% 
@@ -688,8 +745,6 @@ outliers$Secchi <- joinSurveyStationTow() %>%
          Year %in% yearOfInterest) %>% 
   distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
-
-checks$Secchi <- checkQueries(outliers$Secchi, "Edit - Secchi (outliers)")
 
 # SecchiMonth
 outliers$SecchiMonth <- joinSurveyStationTow() %>% 
@@ -757,6 +812,50 @@ outliers$TurbidityMonth <- joinSurveyStationTow() %>%
   distinct() %>% 
   arrange(NAFlag, Outlier, SampleDate)
 
+# Technical coding section ------------------------------------------------
+# This section is currently only for checking if my coding is correct. It can be adapted to 
+# run by the ES's, but the year filters in Access have to be changed as well, so not making
+# this part of the normal code yet. 
+# Have checked all queries with the original and they have all matched so far: 02-07-22, TN
+
+checks <- list()
+
+checks$CableDepth <- checkQueries(outliers$CableDepth, "Edit - Cable out vs Depth")
+
+checks$MeterReading <- checkQueries(outliers$MeterReading, "Edit - Net meter reading out of range")
+
+checks$CB_MeterReading <- checkQueries(outliers$CB_MeterReading, "Edit - CB meter out of range")
+
+checks$NetMeterSerial <- checkQueries(outliers$NetMeterSerial, "Edit - Net Meter Serial")
+
+checks$BottomDepth <- checkQueries(outliers$BottomDepth, "Edit - Bottom Depth (outliers)",
+                                   meanVar = "Mean", 
+                                   sdDownName = "X2...Standard.Devations",
+                                   sdUpName = "X2...Standard.Devations.1")
+
+checks$Temp <- checkQueries(outliers$Temp, "Edit - Temp (outliers)",
+                            meanVar = "Mean", 
+                            sdDownName = "X2...Standard.Devations",
+                            sdUpName = "X2...Standard.Devations.1")
+
+checks$TopEC <- checkQueries(outliers$TopEC, "Edit - Top EC (outliers)",
+                             meanVar = "AvgOfTopEC",
+                             sdDownName = "Lower.Bound",
+                             sdUpName = "Upper.Bound")
+
+checks$BottomEC <- checkQueries(outliers$BottomEC, "Edit - Bottom EC (outliers)",
+                                meanVar = "AvgOfBottomEC",
+                                sdDownName = "Lower.Bound",
+                                sdUpName = "Upper.Bound")
+
+checks$Secchi <- checkQueries(outliers$Secchi, "Edit - Secchi (outliers)",
+                              meanVar = "AvgOfSecchi",
+                              sdDownName = "Lower.Bound",
+                              sdUpName = "Upper.Bound")
+# There isn't a check for turbidity as turbidity in the 20 mm db does not exist
+# All checks should be TRUE, indicating the same output from the script and the query
+if (!all(unlist(checks))) stop("Checks are not all equal")
+
 # Various plots for station vs station/months -----------------------------
 # # These are simply exploratory plots to see how the two variants differ from one another
 # # Does one variant yield much more "outliers" than others?
@@ -773,7 +872,7 @@ outliers$TurbidityMonth <- joinSurveyStationTow() %>%
 #   arrange(SampleDate) %>%
 #   # This is part 3 of the query
 #   select(SampleDate, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
-#   mutate(SampleDate = as.SampleDate(SampleDate)) %>%
+#   mutate(SampleDate = as.Date(SampleDate)) %>%
 #   ggplot(aes(SampleDate, Temp, color = Outlier)) +
 #   geom_point() +
 #   labs(title = "Grouped by station and month")
@@ -792,7 +891,7 @@ outliers$TurbidityMonth <- joinSurveyStationTow() %>%
 #   arrange(SampleDate) %>%
 #   # This is part 3 of the query
 #   select(SampleDate, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
-#   mutate(SampleDate = as.SampleDate(SampleDate)) %>%
+#   mutate(SampleDate = as.Date(SampleDate)) %>%
 #   ggplot(aes(SampleDate, Temp, color = Outlier)) +
 #   geom_point() +
 #   labs(title = "Grouped by station Only")
@@ -824,12 +923,12 @@ outliers$TurbidityMonth <- joinSurveyStationTow() %>%
 #     sd2up = meanLengths + 2 * sd(Length, na.rm = T),
 #     # This is part 2 of the query
 #     # Why this 12-31 cut off...? Ask Adam ####
-#     Outlier = ifelse((Length < sd2down | Length > sd2up) & SampleDate > as.SampleDate("2012-12-31"), T, F),
+#     Outlier = ifelse((Length < sd2down | Length > sd2up) & SampleDate > as.Date("2012-12-31"), T, F),
 #     NAFlag = ifelse(is.na(Length), T, F)) %>% 
 #   arrange(SampleDate) %>% 
 #   # This is part 3 of the query
 #   select(SampleDate, Month, FishCode, Length, meanLengths, sd2down, sd2up, Outlier, NAFlag) %>% 
-#   mutate(SampleDate = as.SampleDate(SampleDate)) %>% 
+#   mutate(SampleDate = as.Date(SampleDate)) %>% 
 #   filter(Outlier == T | NAFlag == T) %>% 
 #   arrange(NAFlag, Outlier, SampleDate) %>% 
 #   View()
@@ -842,12 +941,12 @@ outliers$TurbidityMonth <- joinSurveyStationTow() %>%
 #     quant25 = quantile(Length, probs = 0.25, na.rm = T),
 #     quant75 = quantile(Length, probs = 0.75, na.rm = T),
 #     iqr = quant75 - quant25,
-#     Outlier = ifelse((Length < quant25 - (iqr * 3) | Length > quant75 + (iqr * 3)) & SampleDate > as.SampleDate("2012-12-31"), T, F),
+#     Outlier = ifelse((Length < quant25 - (iqr * 3) | Length > quant75 + (iqr * 3)) & SampleDate > as.Date("2012-12-31"), T, F),
 #     NAFlag = ifelse(is.na(Length), T, F)) %>% 
 #   arrange(SampleDate) %>% 
 #   # This is part 3 of the query
 #   select(SampleDate, Month, FishCode, Length, quant25, quant75, iqr, Outlier, NAFlag) %>% 
-#   mutate(SampleDate = as.SampleDate(SampleDate)) %>% 
+#   mutate(SampleDate = as.Date(SampleDate)) %>% 
 #   filter(Outlier == T | NAFlag == T) %>% 
 #   arrange(NAFlag, Outlier, SampleDate) %>% 
 #   View()
@@ -858,8 +957,7 @@ outliers$TurbidityMonth <- joinSurveyStationTow() %>%
 
 # This is a temp name
 # Adding the 3 columns that Adam requested for the ES in charge to fill in to document result of analysis
-saveSheet <- lapply(outliers, function(x) mutate(x, 
-                                                 SampleDate = as.Date(SampleDate),
+saveSheet <- lapply(outliers, function(x) mutate(x,
                                                  IsOutlier = NA, ChangedTo = NA, CommentsOutlier = NA,
                                                  # Strange XML character in some rows of the comments column in the
                                                  # Water Info table; removing this so that the excel file saves correctly
