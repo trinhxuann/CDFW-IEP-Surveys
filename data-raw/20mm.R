@@ -151,13 +151,15 @@ read20mmAccess <- function(surveyName = "20mm",
   # Will select only the columns that matter:
   
   # Removing extra "JustEdited" from this table
+  # Also transforming SampleDate to as.Date instead
   surveyPosition <- which(sapply(TTmmTables,
                                  function(tables) any(grepl("JustEdited",
                                                             x = names(tables),
                                                             ignore.case = T))))
   
   TTmmTables[[surveyPosition]] <- TTmmTables[[surveyPosition]] %>%
-    select(-JustEdited)
+    select(-JustEdited) %>% 
+    mutate(SampleDate = as.Date(SampleDate))
   
   # Station table OK
   # Tow OK

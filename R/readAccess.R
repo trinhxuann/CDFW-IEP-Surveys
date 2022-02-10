@@ -73,7 +73,7 @@ pullAccessDF(script = "SLS.R",
 # UDrive route
 pullAccessDF(script = "20mm.R",
              bypass = T,
-             file = "U:\\NativeFish\\SmeltData\\DS-DATA\\20-mm local\\20-mm_FishZooData_Backup.accdb",
+             file = "U:\\NativeFish\\SmeltData\\DS-DATA\\20-mm local\\20-mm_FishZooData.accdb",
              tablesReturned = c("Survey", "Station", "Tow", "Gear", "GearCodesLkp", "MeterCorrections",
                                 "StationCords", "FishSample", "FishLength"))
 
