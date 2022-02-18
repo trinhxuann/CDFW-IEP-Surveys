@@ -32,7 +32,7 @@ SLSIntegrate <- function(filePath = NULL) {
                                            CatchID = readr::col_integer()
                                          )
   ) %>%
-    dplyr::mutate(Date=as.Date(Date))
+    dplyr::mutate(Date = as.Date(Date))
   
   SLSTables$Lengths <- readr::read_delim(file.path("data-raw", "SLS", "Lengths.csv"), delim = ",",
                                          col_types =
@@ -45,7 +45,7 @@ SLSIntegrate <- function(filePath = NULL) {
                                              EntryOrder = readr::col_integer()
                                            )
   )%>%
-    dplyr::mutate(Date=as.Date(Date))
+    dplyr::mutate(Date = as.Date(Date))
   
   SLSTables$`Meter Corrections` <- readr::read_delim(file.path("data-raw", "SLS", "MeterCorrections.csv"), delim = ",",
                                                      col_types =
@@ -99,10 +99,10 @@ SLSIntegrate <- function(filePath = NULL) {
                                                   TopEC = readr::col_integer(),
                                                   BottomEC = readr::col_integer(),
                                                   Secchi = readr::col_integer(),
-                                                  Turbidity = readr::col_integer(),
+                                                  Turbidity = readr::col_double(),
                                                   Comments = readr::col_character()
                                                 )
-  )%>%
+  ) %>%
     dplyr::mutate(Date=as.Date(Date))%>%
     dplyr::rename(Notes_env=Comments)
   
@@ -126,6 +126,12 @@ SLSIntegrate <- function(filePath = NULL) {
     dplyr::mutate(across(c(LatD, LatM, LatS, LonD, LonM, LonS), ~as.numeric(.x)),
                   Latitude=(LatD + LatM/60 + LatS/3600),
                   Longitude= -(LonD + LonM/60 + LonS/3600))
+  
+  # Were there any problems with the reading process?
+  if (sum(sapply(SLSTables, function(x) nrow(problems(x)))) > 0) {
+    warning("Problems were detected during the read phase. Check the code")
+    browser()
+  }
   
   # Manipulating the data tables --------------------------------------------
   
@@ -187,49 +193,181 @@ SLSIntegrate <- function(filePath = NULL) {
     dplyr::group_by(Date, Station, Tow, FishCode) %>%
     dplyr::mutate(TotalLengthMeasured = sum(LengthFrequency)) %>%
     dplyr::ungroup()
+
+  # Joining the tables ------------------------------------------------------
+  
+  # After joining, will want to check to see if values have been deleted or added
+  # during the joining process
   
   # Now to combine the datasets together, following the relationship table in Access
   # The tables go waterInfo -> towInfo -> Catch -> lengths
-  SLS <- waterInfo %>%
+  
+  # This function will be used to compare the joined df to the base tables at every step
+  # to identify what is being deleted/added to the database
+  # should only be additions here due to the use of full_join
+  compareDF <- function(baseDF, targetDF, 
+                        distinctTarget = T, 
+                        arrangeKey = c("Date", "Station")) {
+    
+    baseDF <- baseDF %>% 
+      dplyr::arrange(dplyr::across(arrangeKey)) %>% 
+      data.frame()
+    
+    if (distinctTarget) {
+      targetDF <- targetDF %>%
+        dplyr::select(names(baseDF)) %>% 
+        dplyr::distinct() %>% 
+        dplyr::arrange(dplyr::across(arrangeKey)) %>% 
+        data.frame()
+    } else {
+      targetDF <- targetDF %>% 
+        dplyr::select(names(baseDF)) %>% 
+        dplyr::arrange(dplyr::across(arrangeKey)) %>% 
+        data.frame()
+    }
+    
+    all.equal(baseDF, targetDF)
+  }
+  
+  joinCheckSteps <- list()
+  # Now begin joining
+  
+  # waterInfo and towInfo together
+  waterTowJoin <- waterInfo %>% 
     dplyr::full_join(towInfo,
-                     by = c("Date", "Station")) %>%
-    dplyr::full_join(catch,
-                     by = c("Date", "Station", "Tow")) %>%
+                     c("Date", "Station"))
+  
+  joinCheckSteps$waterTowWater <- compareDF(waterInfo, waterTowJoin)
+  joinCheckSteps$waterTowTow <- compareDF(towInfo, waterTowJoin)
+  # Ok
+
+  # Now joining catch to waterInfo + towInfo joined table
+  waterTowCatchJoin <- waterTowJoin %>% 
+    full_join(catch,
+              by = c("Date", "Station", "Tow"))
+  
+  joinCheckSteps$waterTowCatchWater <- compareDF(waterInfo, waterTowCatchJoin)
+  joinCheckSteps$waterTowCatchTow <- compareDF(towInfo, waterTowCatchJoin)
+  compareDF(catch, waterTowCatchJoin)
+  # Check catch (+105 NAs)
+  joinCheckSteps$waterTowCatchCatch <- compareDF(catch, waterTowCatchJoin %>% 
+                                                   filter(!is.na(Catch)))
+  # NOTE HERE; there are instances when tows do not catch any
+  # fish at all and these instances are NOT recorded in the catch
+  # table. If you use inner_join here, you run into the trouble
+  # of losing environmental data; this is because environmental data
+  # is still recorded even if catch is 0 but this only shows up
+  # in the waterInfo table. Use of full_join is more appropriate here
+  
+  # Now join to length table
+  waterTowCatchLengthJoin <- waterTowCatchJoin %>% 
     dplyr::full_join(lengths,
-                     by = c("Date", "Station", "Tow", "FishCode")) %>%
-    # Adding in taxa name based on Species Code.csv file
+              by = c("Date", "Station", "Tow", "FishCode"))
+  
+  joinCheckSteps$waterTowCatchLengthWater <- compareDF(waterInfo, waterTowCatchLengthJoin)
+  joinCheckSteps$waterTowCatchLengthTow <- compareDF(towInfo, waterTowCatchLengthJoin)
+  compareDF(catch, waterTowCatchLengthJoin)
+  compareDF(lengths, waterTowCatchLengthJoin)
+  # Similar problem from catch propagated
+  joinCheckSteps$waterTowCatchLengthCatch <- compareDF(catch, waterTowCatchLengthJoin %>% 
+                                                         dplyr::filter(!is.na(Catch)))
+  # Check lengths (+106 NAs)
+  joinCheckSteps$waterTowCatchLengthLengths <- compareDF(lengths, waterTowCatchLengthJoin %>% 
+                                                           dplyr::filter(!is.na(Length)))
+  # The +1 error that is propagated via length table happened on 
+  # This occurred on 2009-02-18, station 508 during which there is 1 entry of
+  # FishCode == 99 without a length or catch. When removed.
+  
+  # Now the last joinig steps, to species code and station #
+  # This step should never add or delete rows given that it's a left_join only
+  finJoin <- waterTowCatchLengthJoin %>% 
     dplyr::left_join(LTMRdata::Species %>%
                        dplyr::select(TMM_Code,
                                      Taxa) %>%
                        dplyr::filter(!is.na(TMM_Code)),
-                     by = c("FishCode"="TMM_Code")) %>%
+                     by = c("FishCode" = "TMM_Code")) %>%
     dplyr::left_join(SLSTables$`20mm Stations`,
-                     by="Station")%>%
+                     by = "Station")
+  
+  # Final comparison between length and final table:
+  # Length chosen here because it is the finest resolution table to be
+  # joined. Everything else will have duplications to accomodate per
+  # individual lengths
+  
+  lengthCheckDF <- lengths %>% 
+    dplyr::summarise(dplyr::across(where(is.numeric), ~sum(.x, na.rm = T)))
+  lengthCheckJoinedDF <- finJoin %>% 
+    dplyr::select(names(lengths)) %>% 
+    dplyr::summarise(dplyr::across(where(is.numeric), ~sum(.x, na.rm = T)))
+  
+  joinCheckSteps$length <- all.equal(lengthCheckDF %>% 
+                                       dplyr::select(Length, LengthFrequency, TotalLengthMeasured),
+                                     lengthCheckJoinedDF %>% 
+                                       dplyr::select(Length, LengthFrequency, TotalLengthMeasured))
+  
+  # Final output ------------------------------------------------------------
+
+  SLS <- finJoin %>%
     # Merging the two comment columns together; they both have data in them
-    dplyr::mutate(Notes_tow=paste(Notes_tow, Notes_env, sep = "; ")) %>%
+    dplyr::mutate(Notes_tow = paste(Notes_tow, Notes_env, sep = "; ")) %>%
     dplyr::arrange(Date, Datetime, Survey, Station, Tow, Taxa, Length) %>%
     dplyr::mutate(Source = "SLS",
-                  SampleID=paste(Source, Date, Station, Tow), # Creating SampleID index
+                  SampleID = paste(Source, Date, Station, Tow), # Creating SampleID index
                   Count = dplyr::if_else(is.na(Length), as.numeric(Catch), (LengthFrequency/TotalLengthMeasured) * Catch),
                   # Creating Length_NA_flag to parallel the other survey datasets in LTMR
                   Length_NA_flag = dplyr::if_else(is.na(Count), "No fish caught", NA_character_),
                   # Creating Method column; Adam described this as an "Olbique tow", significantly diff from WMT
                   Method = "Oblique tow",
-                  Station=as.character(Station))%>%
-    # Removing CatchID and entryorder as they are not relevant to the dataset
-    # Removing TopEC, BottomEC as they have been converted over the salinity already
-    # Removing CBMeterSerial, CBMeterStart, CBMeterEnd, CBMeterCheck as CB not ran on the SLS
-    dplyr::select(Source, Station, Latitude, Longitude,
-                  Date, Datetime, Survey, Depth, SampleID, Method,
-                  Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, Turbidity, Tow_volume,
-                  Cable_length=CableOut, Tow_duration=Duration,
-                  Taxa, Length, Count, Length_NA_flag,
-                  Notes_tow, Notes_flowmeter = Notes)
+                  Station=as.character(Station))
   
-  # # Just to make sure that no duplications occurred; lengths should be the same
-  # all.equal(lengths$Length %>% sum(na.rm = T),
-  #           dfFin$Length %>% sum(na.rm = T))
+  # One last step to QAQC; can we get back to the base tables from this joined table?
+  # waterInfo
+  joinCheckSteps$waterInfoFin <- compareDF(SLS %>% 
+              select(names(waterInfo)) %>% 
+              distinct(),
+            waterInfo, distinctTarget = F)
+  # towInfo
+  joinCheckSteps$towInfoFin <- compareDF(SLS %>% 
+              # Notes_tow column here is slightly modified from original
+              # This column pastes 2 columns together, resulting in no NAs
+              select(names(towInfo), -Notes_tow) %>% 
+              distinct(),
+            towInfo,
+            distinctTarget = F)
+  # catch
+  joinCheckSteps$catchFin <- compareDF(SLS %>% 
+              select(names(catch)) %>% 
+              distinct() %>% 
+              filter(!is.na(Catch)) %>% 
+              arrange(Date, Station, Tow, FishCode),
+            catch %>% 
+              arrange(Date, Station, Tow, FishCode),
+            distinctTarget = F)
+  # length
+  joinCheckSteps$lengthFin <- compareDF(SLS %>% 
+              select(names(lengths)) %>% 
+              distinct() %>% 
+              filter(!is.na(Length)) %>% 
+              arrange(Date, Station, Tow, FishCode),
+            lengths %>% 
+              arrange(Date, Station, Tow, FishCode),
+            distinctTarget = F)
   
+  if (any(!unlist(joinCheckSteps))) {
+    warning("There are unaccounted for additions/deletions to the joining process. Check steps.", call. = F)
+    browser()
+  } else {
+    SLS <- SLS %>% 
+      # Removing CatchID and entryorder as they are not relevant to the dataset
+      # Removing TopEC, BottomEC as they have been converted over the salinity already
+      # Removing CBMeterSerial, CBMeterStart, CBMeterEnd, CBMeterCheck as CB not ran on the SLS
+      dplyr::select(Source, Station, Latitude, Longitude,
+                    Date, Datetime, Survey, Depth, SampleID, Method,
+                    Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, Turbidity, Tow_volume,
+                    Cable_length = CableOut, Tow_duration = Duration,
+                    Taxa, Length, Count, Length_NA_flag,
+                    Notes_tow, Notes_flowmeter = Notes)
+  }
   SLS
 }
 
