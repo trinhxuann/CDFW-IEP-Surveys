@@ -1,11 +1,10 @@
-# This script is meant to bridge between the Access database and Sam's LTMRdata package
-# Since the LTMR data package takes in individual flat files as inputs, this script
-# will simply connect to Access, pull the relevant tables, export it via text/csv, and finish
-# The function will download the Access database from the public FTP website or connect
+# This script will connect to Access, pull the relevant tables, export it via text/csv, and finish
+# The function can also download the Access database from the public FTP website or connect
 # To the file located on the UDrive for manipulations. The UDrive option is default.
 # To use the UDrive, one must be connected to the UDrive via being in the office or via VPN.
 # To get the Access connection to work, you will need the DBI and odbc packages
 # You will also need R in the same architecture as your Access database 
+# I may remove the download from FTP website link option because that is depreciated.
 
 # Libraries needed
 library(dplyr, warn.conflicts = F)
@@ -13,6 +12,8 @@ library(DBI)
 library(odbc)
 
 # This will evaluate arguments accompanied with the terminal command to use in this specific script
+# IF you are working in 32-bit R, then this script is called on by the readAccess.R directly and
+# this variable will already be defined
 if (!exists("Args")) {
   Args = commandArgs(T)
 } 
@@ -80,19 +81,21 @@ readSLSAccess <- function(file = Args[2],
   
   # In order to use this correctly, you need to have the 32-bit version of R installed
   # This function is used with system() below to create an rds file 
-  # required by the rest of the script
+  # which is required by the rest of the QAQC script
   
-  # If the downloadSLS() function was used to download the SLS files, then it will be stored in the 
-  # temp directory, of which will pull here
+  # If the downloadSLS() function was used to download the SLS files, then the downloaded file will be 
+  # stored in the temp directory, of which will pull here
   if (is.na(file) | file == shQuote("NA") | file == "NA") {
     tempFile <- list.files(tempdir())[grep(paste0(surveyName, "*.+zip"), list.files(tempdir()))]
     
-    # Extracting the downloaded file from downloadSLS()
+    # Extracting the downloaded file from downloadSLS(), which is a zip file
     if (grepl(".zip", tempFile)) {
       localDbFile <- unzip(zipfile = file.path(exdir, tempFile), exdir = exdir)
     }
   } else {
     localDbFile <- file
+    # You need to be on VPN to access the U drive, where the local db is housed. This error will also occur
+    # IF the name of the db file was changed for some reason.
     if (!file.exists(file)) stop("File path not found. Did you specify right? Are you on VPN?", call. = F)
   }
   
@@ -101,6 +104,7 @@ readSLSAccess <- function(file = Args[2],
                      "Dbq=", localDbFile)
 
   # Connection variable itself
+  # tryCatch used here to make potential errors more user friendly
   con <- tryCatch(DBI::dbConnect(drv = odbc::odbc(), .connection_string = dbString),
                   error = function(cond) {
                     if (all(stringr::str_detect(cond$message, c("IM002", "ODBC Driver Manager")))) {
@@ -130,10 +134,11 @@ readSLSAccess <- function(file = Args[2],
                       MoreArgs = list(conn = con))
   
   # Cleaning up connection
-  # The downloaded files will be auto deleted once R shuts down
+  # The downloaded files (if you are pulling from the FTB) will be auto deleted once R shuts down
   DBI::dbDisconnect(con)
   
   # Need to remove extra columns from the database. Will select only the columns that matter:
+  # I determined what columns are required by looking at what the public Access database currently has
   # Catch table = ok as is, for both the FTP and UDrive databases
   # Length table
   lengthPosition <- which(sapply(SLSTables, 
@@ -208,7 +213,6 @@ readSLSAccess <- function(file = Args[2],
   # Within the affected DFs, round the affected columns to 7 and then 2 digits
   # I believe the step to round to 7 digits is not needed but does not really affect computational speed
   # Will leave because mechanically, "single" field size is 7 digits long.
-  
   for (i in floatIssueDF) {
     
     columnsAffected <- floatIssue[[i]]
@@ -269,6 +273,6 @@ readSLSAccess <- function(file = Args[2],
   cat("\nDone! \n")
 }
 
-# # Run the functions to download and read the database
+# Run the functions to download and read the database
 downloadSLS()
 readSLSAccess()

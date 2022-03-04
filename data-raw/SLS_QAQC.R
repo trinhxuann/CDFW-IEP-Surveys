@@ -17,11 +17,15 @@ library(leaflet)
 data <- readRDS(file.path("data-raw", "SLS", "SLSTables.rds"))
 
 # Empty list to house the outliers in
+# This is a stylistic preference. I believe that it is more efficient to house the data in this way
+# It keeps the environment cleaner and allows you to run apply functions through each element in the list
 outliers <- list()
 
-# When this analysis is up to date, will likely only want to see data from
+# When this analysis is up to date, you will likely only want to see data from
 # the current season. Currently, the season for SLS spans from Dec-Mar of each WY
 # Also adding a second requirement that the latest data entry is later than Dec 1 of current year
+# To find yearOfInterest, take today and add a 1 to it IF the current season is underway, 
+# so if today is AFTER Dec 1 AND if there is data entered that is AFTER Dec 1 as well.
 
 yearOfInterest <- year(today()) + (month(today()) > 11 & max(data$WaterInfo$Date) > as.Date(paste0(year(today()), "-12-01")))
 
@@ -30,6 +34,7 @@ yearOfInterest <- year(today()) + (month(today()) > 11 & max(data$WaterInfo$Date
 # Order of names listed in expectedNames variable does not matter
 expectedNames <- c("Catch", "Lengths", "MeterCorrections", "TowInfo", "WaterInfo", "Station_Lookup")
 
+# This is a simple check to stop the script (if the user opt to run the entire script in its entirety)
 if (!all(names(data) %in% expectedNames)) {
   stop("Table name(s) ", shQuote(names(data)[which(!names(data) %in% expectedNames)]),
           " do/does not have the defaults.")
@@ -53,9 +58,16 @@ if (!all(names(data) %in% expectedNames)) {
 
 GPSDF <- data$WaterInfo %>% 
   # Converting the GPS coordinates from H/M/S to degrees
-  mutate(across(c(Lat, Long), ~str_remove(.x, "\\.") %>% str_remove_all("\\-")),
+  mutate(# Across here is a function that applies a function ACROSS the specified columns (Lat, Long here)
+         # To these columns, remove "." and "-"
+         across(c(Lat, Long), ~str_remove(.x, "\\.") %>% str_remove_all("\\-")),
+         # str_sub to pull digits from the Lat column based on their character index
          LatD = str_sub(Lat, start = 1, end = 2),
          LatM = str_sub(Lat, start = 3, end = 4),
+         # Very specific pattern in in sub and involves knowledge of "regex"
+         # Essentially, in Lat, pull data from position 5 on, find the first 2 digits
+         # replace that with the first two digits you just matched (\\1), a period (.), and the rest
+         # of the match (\\2)
          LatS = sub("(.{2})(.*)", "\\1.\\2", str_sub(Lat, start = 5)),
          LonD = str_sub(Long, start = 1, end = 3),
          LonM = str_sub(Long, start = 4, end = 5),
@@ -67,12 +79,15 @@ GPSDF <- data$WaterInfo %>%
          Long = -(LonD + LonM/60 + LonS/3600),
          # Creating season year to help with the plotting function below
          SeasonYear = year(Date) + (month(Date) > 11),
+         # This group column is to differentiate between the coordinates recorded on the actual tows
+         # vs the theoretical below
          group = "Tow") %>% 
   # Now binding to lon/lat of the 20 mm stations; these will serve as the "average"
   # coordinates that these stations potentially should be at and will serve as a visual
   # comparison to where the tow coordinates are
   bind_rows(data$Station_Lookup %>% 
-              mutate(LatD = sapply(strsplit(.$Lat, "\\s"), "[", 1),
+              mutate(# Current structure of the lat/long is each component separated by spaces: pull that out
+                     LatD = sapply(strsplit(.$Lat, "\\s"), "[", 1),
                      LatM = sapply(strsplit(.$Lat, "\\s"), "[", 2),
                      LatS = sapply(strsplit(.$Lat, "\\s"), "[", 3),
                      LonD = sapply(strsplit(.$Long, "\\s"), "[", 1),
@@ -91,6 +106,7 @@ plotGPS <- function(df, station = NULL, Year = NULL, ...) {
   
   pal <- colorFactor("viridis", domain = c(df$group))
   
+  # Are there a year and station filter? Both?
   if (is.null(Year)) {
     warning("This will plot all tows in the requested data table and may take a substantial amount of resources to complete.", call. = F)
   } else {
@@ -128,21 +144,21 @@ plotGPS(GPSDF, Year = 2022, station = 809, title = "Source")
 
 # Use findOutlierGPS after running plotGPS and visually determining which stations/year may have 
 
-# Finding distance to run the clustering analysis on
+# Finding the spatial distance between the points to run the clustering analysis on
 # Function taken from https://stackoverflow.com/questions/21095643/approaches-for-spatial-geodesic-latitude-longitude-clustering-in-r-with-geodesic
 geo.dist = function(df) {
   require(geosphere)
-  d <- function(i,z){         # z[1:2] contain long, lat columns
-    dist <- rep(0,nrow(z))    # Creates placeholder to begin populating array
-    dist[i:nrow(z)] <- distVincentyEllipsoid(z[i:nrow(z),1:2],z[i,1:2]) # Calculates distances between each points
+  d <- function(i, z){         # z[1:2] contain long, lat columns
+    dist <- rep(0, nrow(z))    # Creates placeholder to begin populating array
+    dist[i:nrow(z)] <- distVincentyEllipsoid(z[i:nrow(z), 1:2], z[i, 1:2]) # Calculates distances between each points
     return(dist)
   }
-  dm <- do.call(cbind,lapply(1:nrow(df),d,df)) # Building the array of distances between each points
+  dm <- do.call(cbind, lapply(1:nrow(df), d, df)) # Building the array of distances between each points
   return(as.dist(dm))
 }
 
 # Function to analyze for outliers based on spatial distances and hierarchical clustering;
-# if k is specified, will also plot the clusters 
+# if k (the # of clusters you want) is specified, will also plot the clusters 
 findOutlierGPS <- function(df, station = NULL, Year = NULL, 
                            k = NULL, print = T) {
   
@@ -157,11 +173,13 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
                   na.omit())
   hc <- hclust(d)
   
+  # There has to be more than two clusters to plot
   if (print & length(hc$order) > 2) plot(hc)
   
   if (!is.null(k)) {
+    # cutree is what cuts the data up into the number of clusters you want
     clusters <- cutree(hc, k)
-    browser()
+    
     # Specifying the cluster
     dfClust <- df %>% 
       filter(!is.na(Long), !is.na(Lat)) %>% 
@@ -179,6 +197,7 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
     
     # Making the assumption here that if it is NOT in the same group as the theoretical coordinates,
     # then it is outlying
+    # Find what "group" is the theoretical cluster; should generally be 1
     theoreticalCluster <- dfClust %>% 
       filter(is.na(Date), is.na(Temp), is.na(LonD)) %>% 
       pull(group)
@@ -229,6 +248,7 @@ GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2)
 # Would envision all clusters other than 1 would be classified as outliers, something like:
 outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, Outlier == T)) %>% 
   bind_rows() %>% 
+  # Bind to this outlying DF also entries that do NOT have a recorded Lat/Long
   bind_rows(data$WaterInfo %>% 
               # This gives a warning of NAs introduced by coercion; can ignore given that these are NAs to start with
               # Will simply supress this because it is not a valid warning
@@ -242,6 +262,9 @@ outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, Outlier == 
          SeasonYear = ifelse(is.na(SeasonYear), year(Date) + (month(Date) > 11), SeasonYear))
 # Note, this does NOT have a SeasonYear %in% yearOfInterest filter; this step should of been taken care of
 # when manually surveying which station is outlying
+
+# Moving forward, there may be a need to add additional filters to the data rows that are NAFlags
+# A season year filter can easily be added here after the initial QAQC of these rows are done
 
 # Cable outliers ----------------------------------------------------------
 
@@ -706,6 +729,7 @@ outliers$TurbidityMonth <- data$WaterInfo %>%
 
 # This is a temp name
 # Adding the 3 columns that Adam requested for the ES in charge to fill in to document result of analysis
+# The use of lapply here will run this mutate operation to all elements of list "outliers" at once
 saveSheet <- lapply(outliers, function(x) mutate(x, IsOutlier = NA, ChangedTo = NA, CommentsOutlier = NA,
                                                  # Strange XML character in some rows of the comments column in the
                                                  # Water Info table; removing this so that the excel file saves correctly
