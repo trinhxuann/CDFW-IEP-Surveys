@@ -1,18 +1,20 @@
-# This script is meant to bridge between the Access database and Sam's LTMRdata package
-# Since the LTMR data package takes in individual flat files as inputs, this script
-# will simply connect to Access, pull the relevant tables, export it via text/csv, and finish
-# The function will download the Access database from the public FTP website or connect
+# This script will connect to Access, pull the relevant tables, export it via text/csv, and finish
+# The function can also download the Access database from the public FTP website or connect
 # To the file located on the UDrive for manipulations. The UDrive option is default.
 # To use the UDrive, one must be connected to the UDrive via being in the office or via VPN.
 # To get the Access connection to work, you will need the DBI and odbc packages
 # You will also need R in the same architecture as your Access database 
+# I may remove the download from FTP website link option because that is depreciated.
 
 # Libraries needed
 library(dplyr, warn.conflicts = F)
+library(stringr)
 library(DBI)
 library(odbc)
 
 # This will evaluate arguments accompanied with the terminal command to use in this specific script
+# IF you are working in 32-bit R, then this script is called on by the readAccess.R directly and
+# this variable will already be defined
 if (!exists("Args")) {
   Args = commandArgs(T)
 } 
@@ -69,14 +71,10 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
                 mode = "wb")
 }
 
-# Function to start reading data from Access directly
-readSLSAccess <- function(file = Args[2],
+# Function to connect to the Access database
+connectAccess <- function(file = Args[2],
                           exdir = tempdir(),
-                          surveyName = "SLS",
-                          returnDF = F,
-                          tablesReturned = Args[-(1:2)]) {
-
-  cat("\nConnecting to Access \n")
+                          surveyName = "SLS") {
   
   # In order to use this correctly, you need to have the 32-bit version of R installed
   # This function is used with system() below to create an rds file 
@@ -93,13 +91,14 @@ readSLSAccess <- function(file = Args[2],
     }
   } else {
     localDbFile <- file
-    if (!file.exists(file)) stop("File path not found. Did you specify right? Are you on VPN?", call. = F)
+    
+    if (!file.exists(localDbFile)) stop("File path not found. Did you specify right? Are you on VPN?", call. = F)
   }
   
   # Driver and path required to connect from RStudio to Access
   dbString <- paste0("Driver={Microsoft Access Driver (*.mdb, *.accdb)};",
                      "Dbq=", localDbFile)
-
+  
   # Connection variable itself
   con <- tryCatch(DBI::dbConnect(drv = odbc::odbc(), .connection_string = dbString),
                   error = function(cond) {
@@ -110,7 +109,23 @@ readSLSAccess <- function(file = Args[2],
                       message(cond)
                     }
                   })
+}
 
+# Function to start reading data from Access directly
+readSLSAccess <- function(file = Args[2],
+                          exdir = tempdir(),
+                          surveyName = "SLS",
+                          returnDF = F,
+                          tablesReturned = Args[-(1:2)]) {
+  pb <- txtProgressBar(min = 0, max = 5, style = 3)
+  startTime <- Sys.time()
+  cat("\nConnecting to Access \n")
+  
+  con <- connectAccess()
+
+  setTxtProgressBar(pb, 1)
+  connectionTime <- Sys.time()
+  
   # Pulling just the table names to be used in mapply() below
   tableNames <- odbc::dbListTables(conn = con)
   # Includes system tables which cannot be read, excluding them below with negate
@@ -119,10 +134,12 @@ readSLSAccess <- function(file = Args[2],
     # If no table names are specified, then simply return the names of the possible databases for the user to pick
     DBI::dbDisconnect(con)
     
-    return(odbc::dbListTables(conn = con))
+    if (length(tablesReturned) == 0) message("Specify at least one table to pull from:")
+    
+    return(tableNames)
   }
   
-  cat("Pulling tables:", tablesReturned, "\n")
+  cat("\n", paste0("Pulling (", length(tablesReturned), ") tables: "), paste(tablesReturned, collapse = ", "), fill = T)
   
   # Apply the dbReadTable to each readable table in db
   SLSTables <- mapply(DBI::dbReadTable,
@@ -130,11 +147,24 @@ readSLSAccess <- function(file = Args[2],
                       MoreArgs = list(conn = con))
   
   # Cleaning up connection
-  # The downloaded files will be auto deleted once R shuts down
+  # The downloaded files (if you are pulling from the FTB) will be auto deleted once R shuts down
   DBI::dbDisconnect(con)
   
   # Need to remove extra columns from the database. Will select only the columns that matter:
-  # Catch table = ok as is, for both the FTP and UDrive databases
+  # I determined what columns are required by looking at what the public Access database currently has
+  # Also, changing Date column from POSIXct to Date format for ease of use; also deals with the
+  # time zone issue.
+  
+  # Catch table
+  catchPosition <- which(sapply(SLSTables, 
+                                function(tables) any(grepl("Catch", 
+                                                           x = names(tables), 
+                                                           ignore.case = T))))
+  
+  SLSTables[[catchPosition]] <- SLSTables[[catchPosition]] %>% 
+    # The catch table is fine, just needs the manipulation to Date
+    mutate(Date = as.Date(Date))
+  
   # Length table
   lengthPosition <- which(sapply(SLSTables, 
                                  function(tables) any(grepl("Length", 
@@ -148,8 +178,9 @@ readSLSAccess <- function(file = Args[2],
   }
   
   SLSTables[[lengthPosition]] <- SLSTables[[lengthPosition]] %>% 
-    select(Date, Station, Tow, FishCode, Length, EntryOrder, YolkSacOrOilPresent)
-  # Meter Correction = ok as i
+    transmute(Date = as.Date(Date),
+              Station, Tow, FishCode, Length, EntryOrder, YolkSacOrOilPresent)
+
   # Tow Info
   towPosition <- which(sapply(SLSTables, 
                               function(tables) any(grepl("BottomDepth", 
@@ -157,8 +188,18 @@ readSLSAccess <- function(file = Args[2],
                                                          ignore.case = T))))
   
   SLSTables[[towPosition]] <- SLSTables[[towPosition]] %>% 
-    select(Date, Station, Tow, Time, Tide, BottomDepth, CableOut, Duration,
-           NetMeterSerial, NetMeterStart, NetMeterEnd, NetMeterCheck, Comments)
+    transmute(Date = as.Date(Date),
+              Station, Tow, 
+              Time, Tide, BottomDepth, CableOut, Duration,
+              NetMeterSerial, NetMeterStart, NetMeterEnd, NetMeterCheck,
+              Comments) %>% 
+    # Unicode encoding issues of the apostrophe symbol here. Will fix this here
+    # \Ufffd == unknown unicode
+    # 35 rows with this error as of 3-18-22
+    mutate(Comments = str_replace(Comments, "\ufffd", "\u0027"))
+  # For the time of tow, will convert the time zone to PST/PDT instead of UTC
+  attr(SLSTables[[towPosition]]$Time, "tzone") <- "America/Los_Angeles"
+  
   # Water Info
   waterPosition <- which(sapply(SLSTables, 
                               function(tables) any(grepl("Temp|Secchi", 
@@ -166,8 +207,21 @@ readSLSAccess <- function(file = Args[2],
                                                          ignore.case = T))))
   
   SLSTables[[waterPosition]] <- SLSTables[[waterPosition]] %>% 
-    select(Survey, Date, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
+    transmute(Survey, 
+              Date = as.Date(Date),
+              Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
            Lat, Long, Comments)
+  
+  # Meter Correction
+  # Columns names are ok; only need to change calibrationDate to as.Date
+  meterCorrectionPosition <- which(sapply(SLSTables, 
+                                          function(tables) any(grepl("CalibrationDate", 
+                                                                     x = names(tables), 
+                                                                     ignore.case = T))))
+  
+  SLSTables[[meterCorrectionPosition]] <- SLSTables[[meterCorrectionPosition]] %>% 
+    mutate(CalibrationDate = as.Date(CalibrationDate))
+  
   # Station_Lookup
   stationPosition <- which(sapply(SLSTables, 
                                   function(tables) any(grepl("RKI", 
@@ -185,6 +239,9 @@ readSLSAccess <- function(file = Args[2],
       select(ID, Station, Description, Lat, Long)
   }
   
+  setTxtProgressBar(pb, 2)
+  pullTime <- Sys.time()
+  
   # Round all numeric values to 7 digits...This gets rid of "ghost numbers", as known by Bay Study,
   # that are caused by the use of "single" field size in Access. When converted to "double"
   # in R and Excel, the addition of additional decimal points causes non-zero digits to appear
@@ -193,6 +250,8 @@ readSLSAccess <- function(file = Args[2],
     substr(x, nchar(x) - n + 1, nchar(x))
     # Function sourced from: https://stackoverflow.com/questions/7963898/extracting-the-last-n-characters-from-a-string-in-r?rq=1
   }
+  
+  cat("\nChecking for float issues.", fill = T)
   
   floatIssue <- lapply(SLSTables, function(x) {
     df <- x %>% 
@@ -208,30 +267,40 @@ readSLSAccess <- function(file = Args[2],
   # Within the affected DFs, round the affected columns to 7 and then 2 digits
   # I believe the step to round to 7 digits is not needed but does not really affect computational speed
   # Will leave because mechanically, "single" field size is 7 digits long.
-  
   for (i in floatIssueDF) {
     
     columnsAffected <- floatIssue[[i]]
     
-    cat("\nColumn(s)", columnsAffected, "in the", i, "DF experienced float issues. Rounding accordingly. \n")
+    cat("Column(s)", paste(columnsAffected, collapse = ", "), "in the", i, "data table experienced float issues. Rounding accordingly.", fill = T)
     
     SLSTables[[i]] <- SLSTables[[i]] %>% 
       mutate(across(all_of(columnsAffected), ~round(.x, 7)),
              across(all_of(columnsAffected), ~round(.x, 2)))
   }
   
-  # For instances where you do not want to write the rda and want to work 
+  setTxtProgressBar(pb, 3)
+  floatTime <- Sys.time()
+  # For instances where you do not want to write the rds and want to work 
   # entirely in this environment, returnDF will be used
   
   if (returnDF) {
     
-    cat("Returning dataframe only \n")
+    cat("\nReturning dataframe only \n")
+    setTxtProgressBar(pb, 5)
+    close(pb)
+    endTime <- Sys.time()
+    
+    cat("Connection time: ", (connectionTime - startTime)/60, 
+        "; pull time: ", (pullTime - connectionTime)/60,
+        "; float time: ", (floatTime - pullTime)/60,
+        "; overall time: ", (connectionTime - floatTime)/60, " seconds.", fill = T)
+  
     return(SLSTables)
     
   } else {
-    # If not returning the df, will return BOTH the csv files AND RDA file
+    # If not returning the df, will return BOTH the csv files AND RDS file
     
-    cat("Exporting csv flat files \n")
+    cat("\nExporting csv flat files \n")
     
     writeFiles <- sapply(seq_along(SLSTables), function(i) {
       
@@ -241,10 +310,14 @@ readSLSAccess <- function(file = Args[2],
       
       write.csv(SLSTables[[i]],
                 file = filePath,
-                row.names = F)
+                row.names = F,
+                fileEncoding = "UTF-8")
       
       file.exists(filePath)
     })
+    
+    setTxtProgressBar(pb, 4)
+    writeTime <- Sys.time()
     
     if (!all(writeFiles)) {
       df <- data.frame(tableNames = tableNames,
@@ -255,20 +328,32 @@ readSLSAccess <- function(file = Args[2],
            paste0(length(errors), " out of ", length(df$tableNames), " tables \n"),
            paste0(errors, "\n"), call. = F)
     } else {
-      cat("All tables exported successfully \n")
+      cat("\nAll tables exported successfully \n")
     }
     cat("Exporting rds file \n")
     
-    # Now returning the rda
+    # Now returning the rds
     saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rds"),
-            compress = T)
+            compress = T, ascii = T)
     
-    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rds"))) cat("RDA file created successfully  \n")
-    else (stop("RDA file was NOT created, something failed!"))
+    setTxtProgressBar(pb, 5)
+    saveTime <- Sys.time()
+    
+    if (file.exists(file.path("data-raw", surveyName, "SLSTables.rds"))) cat("\nRDS file created successfully  \n")
+    else (stop("\nRDS file was NOT created, something failed!"))
   }
-  cat("\nDone! \n")
+  close(pb)
+  endTime <- Sys.time()
+  cat("Done! \n")
+  
+  cat(paste0("Connection time: ", round(as.numeric(connectionTime - startTime, units = "secs"), 1), 
+             "; pull time: ", round(as.numeric(pullTime - connectionTime, units = "secs"), 1),
+             "; float time: ", round(as.numeric(floatTime - pullTime, units = "secs"), 1),
+             "; write time: ", round(as.numeric(writeTime - floatTime, units = "secs"), 1),
+             "; save time: ", round(as.numeric(saveTime - writeTime, units = "secs"), 1),
+             "; overall time: ", round(as.numeric(endTime - startTime, units = "secs"), 1), " seconds."), fill = T)
 }
 
-# # Run the functions to download and read the database
+# Run the functions to download and read the database
 downloadSLS()
 readSLSAccess()

@@ -28,16 +28,21 @@ pullAccessDF <- function(script = c("SLS.R", "20mm", "SKT"),
       stop("A 32-bit R could not be found on this machine", call. = F)
     }
     
-    # File path of the script
+    # File path of the script you want to run
     filePath <- file.path(getwd(), "data-raw", script)
     
-    # Does your file path of the database have spaces in it?
+    # Does your file of the database have spaces in its name? if so remove them
     file <- shQuote(file)
-    # Does your tables have spaces in them?
+    # Does your tables have spaces in them? if so remove them
     tablesReturned <- unlist(paste0(lapply(tablesReturned, shQuote), collapse = " "))
     
+    # Is there a space in the file path...? This is something that R cannot handle in this specific application
+    # Since I cannot account for it here, this error will warn you specifically to change it on your machine.
     if (grepl("\\s", filePath)) stop("The filepath has a space somewhere along the path. Please remove the space.")
     
+    # This system command can be finnicky. A lot of information is passed from this command into
+    # a new terminal of R, so specific formats must be followed here. Currently, this is set up as
+    # user friendly as possible via arguments in this function.
     terminalOutput <- system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", filePath,
                                     " ", bypass, 
                                     " ", file,
