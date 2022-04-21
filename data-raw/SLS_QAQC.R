@@ -225,7 +225,7 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
 
 GPSOutlying <- list()
 # GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022)
-GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022, k = 2)
+GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022, k = 3)
 GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
 GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
 GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2, plot = F)
