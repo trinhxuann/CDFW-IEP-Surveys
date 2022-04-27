@@ -147,7 +147,9 @@ read20mmAccess <- function(surveyName = "20mm",
   
   # Need to remove extra columns from the database. This is because the files on the UDrive
   # is not 100% the same as the file uploaded to the FTP website. Will only retain columns
-  # that are found on the FTP website version available to the public.
+  # that are found on the FTP website version available to the public. This is also why
+  # the position index is used to identify the tables and not simply using the station name
+  # itself--there are instances when the names of the tables are different between ftp and UDrive
   # Will select only the columns that matter:
   
   # Removing extra "JustEdited" from this table
@@ -161,8 +163,22 @@ read20mmAccess <- function(surveyName = "20mm",
     select(-JustEdited) %>% 
     mutate(SampleDate = as.Date(SampleDate))
   
-  # Station table OK
-  # Tow OK
+  # Station, changing lat/long to numeric
+  stationPosition <- which(sapply(TTmmTables,
+                                  function(tables) any(grepl("LatDeg",
+                                                             x = names(tables),
+                                                             ignore.case = T))))
+  
+  TTmmTables[[stationPosition]] <- TTmmTables[[stationPosition]] %>% 
+    mutate(across(c(LatDeg, LatMin, LatSec, LonDeg, LonMin, LonSec), ~as.numeric(.x)))
+  # Tow, changing time to PST/PDT
+  towPosition <- which(sapply(TTmmTables,
+                              function(tables) any(grepl("TowTime",
+                                                         x = names(tables),
+                                                         ignore.case = T))))
+  
+  attr(TTmmTables[[towPosition]]$TowTime, "tzone") <- "America/Los_Angeles"
+  
   # Gear
   gearPosition <- which(sapply(TTmmTables,
                                function(tables) any(grepl("ProcessDate",
@@ -173,13 +189,32 @@ read20mmAccess <- function(surveyName = "20mm",
     select(-c(ProcessDate, Processor, ProcessingTime))
   
   # GearCodesLkp Ok
-  # MeterCorrections ok
+  # MeterCorrections, changing CalibrationDate to Date format
+  meterCorrectionsPosition <- which(sapply(TTmmTables,
+                                           function(tables) any(grepl("CalibrationDate",
+                                                                      x = names(tables),
+                                                                      ignore.case = T))))
+  
+  TTmmTables[[meterCorrectionsPosition]] <- TTmmTables[[meterCorrectionsPosition]] %>%
+    mutate(CalibrationDate = as.Date(CalibrationDate))
+  
   # There is a "20mmStations" base table in the FTP version; this is NOT available in the most current
   # UDrive local database. Instead, will use the "StationCords" table from local
   # StationCords table ok
   
   # FishSample ok
   # FishLength ok
+  
+  # Some unicode hiccups like the SLS. \u0092t here for '; also \u0085 for "next line"
+  #     mutate(Comments = str_replace(Comments, "\ufffd", "\u0027"))
+  # For tables with "Comments", these unicode errors exist
+  commentsTables <- sapply(TTmmTables, function(x) any(grepl("Comments", names(x))))
+  
+  for (i in which(commentsTables)) {
+    TTmmTables[[i]] <- TTmmTables[[i]] %>% 
+      mutate(Comments = str_replace(Comments, "\ufffd", "\u0027"))
+  }
+  # Note, this changes ALL unidentified unicodes to have an apostrophe
   
   setTxtProgressBar(pb, 2)
   pullTime <- Sys.time()
@@ -253,7 +288,8 @@ read20mmAccess <- function(surveyName = "20mm",
       
       write.csv(TTmmTables[[i]],
                 file = filePath,
-                row.names = F)
+                row.names = F,
+                fileEncoding = "UTF-8")
       
       file.exists(filePath)
     })

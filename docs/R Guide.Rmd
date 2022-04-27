@@ -1,7 +1,7 @@
 ---
 title: "How-to-Bang-Your-Head-Against-the-Wall: A guide to general data manipulations in R"
-author: "Trinh Nguyen, CDFW IEP"
-date: "April 15, 2022"
+author: "Trinh Nguyen, James R. White"
+date: "April 25, 2022"
 output:
   html_document:
     fig_caption: true
@@ -51,7 +51,7 @@ Fast forward to now, looking back, I believe what would have helped me better le
 
 ## Focus and goals
 
-The topics covered in this guide will center around the Smelt Larval Survey publication process. Most functions used in that process will be featured here. I have assumed that if you are reading this, that you have just began dipping your toes into R. My goals of this guide are to provides you with enough background and information to: 1) begin learning R join the dark side and 2) begin understanding the logic behind the manipulations in the SLS publication system. 
+The topics covered in this guide will center around the Smelt Larval Survey publication process. Most functions used in that process will be featured here. we have assumed that if you are reading this, that you have just began dipping your toes into R. Our goals of this guide are to provides you with enough background and information to: 1) begin learning R join the dark side and 2) begin understanding the logic behind the manipulations in the SLS publication system.
 
 ## Getting started in R
 
@@ -85,9 +85,9 @@ library(tidyverse)
 
 ## Coding style
 
-A script should be coded in such a way that it is easy to follow and read. This will be interpreted differently across all users. However, there are popular styles out there that people have gravitated towrads. For R, two popular styles are the [tidyverse style](https://style.tidyverse.org/) and [Google's style](https://google.github.io/styleguide/Rguide.html). Fortunately, both of these styles are derivations from each other, and I recommend you to simply start with the tidyverse link. The word "start" is key here, because you will likely have personal preferences that will ultimately curate a style that is unique to you. As long as your style is easy to follow and read, this should not be a problem.
+A script should be coded in such a way that it is easy to follow and read. This will be interpreted differently across all users. However, there are popular styles out there that people have gravitated towrads. For R, two popular styles are the [tidyverse style](https://style.tidyverse.org/) and [Google's style](https://google.github.io/styleguide/Rguide.html). Fortunately, both of these styles are derivations from each other, and we recommend you to simply start with the tidyverse link. The word "start" is key here, because you will likely have personal preferences that will ultimately curate a style that is unique to you. As long as your style is easy to follow and read, this should not be a problem.
 
-In the following guide, the examples will be written in my style of coding. I believe you should take away from my style anything that you think makes the code clearer and change anything that fails to do so.
+In the following guide, the examples will be written in a specific style of coding. We believe you should take away from this style anything that you think makes the code clearer and change anything that fails to do so.
 
 ## General syntax of R
 
@@ -95,7 +95,7 @@ R has several fundamental components that all users should be familiar with.
 
 ### Comments
 
-An R script can contain code *and* comments. Comments are narratives that the authors write within the script. A line of comment is preceded by the symbol `#` followed by any text. It is best practice to comment your code as you go to help explain your approaches for the future you or your users. I have learned that it *is* worth making the extra effort to write in complete sentences and thoughts, because the you that is coding a section is likely smarter than the you that will be reading that section.
+An R script can contain code *and* comments. Comments are narratives that the authors write within the script. A line of comment is preceded by the symbol `#` followed by any text. It is best practice to comment your code as you go to help explain your approaches for the future you or your users. we have learned that it *is* worth making the extra effort to write in complete sentences and thoughts, because the you that is coding a section is likely smarter than the you that will be reading that section.
 
 ```{r comments}
 # This is a comment
@@ -151,7 +151,7 @@ c(1, 2, 3, 4, 5, 6, 7, 8, 9)
 # Here, 10 values are combined, but since any number of values can be combined, the ... is used.
 ```
 
-The ellipsis can be confusing, but is often used to provide a function with additional flexibility. 
+The ellipsis can be confusing, but is often used to provide a function with additional flexibility.
 
 ### Assignments {#assignment}
 
@@ -179,7 +179,7 @@ factor(c("worse", "ok", "good", "best"),
 
 The `levels = ` argument in `factor()` determines the order of your groups and is simply a vector of your groups. You should specify these levels manually if the order is important; if you do not, R will specify these levels automatically in alphabetical order.
 
-And finally, dates can exist in several formats in R. The first and simplest form is the "Date" format, which contains only calendar date data. Dates in this structure is stored as year-month-day format. The two other structure are "POSIXct" and "POSIXlt", which contains both calendar dates and time data in year-month-day hour:minutes:seconds format. The main difference between the "ct" vs "lt" formats is that the "lt" variant stores all components of date and time as a list for you to access. Overall, I recommend sticking with the "Date" format to avoid confusion. You should only use the POSIX formats if you absolutely need to account for time and time zones. For a much more in-depth discussion of dates, please refer to this [link](https://www.stat.berkeley.edu/~s133/dates.html).
+And finally, dates can exist in several formats in R. The first and simplest form is the "Date" format, which contains only calendar date data. Dates in this structure is stored as year-month-day format. The two other structure are "POSIXct" and "POSIXlt", which contains both calendar dates and time data in year-month-day hour:minutes:seconds format. The main difference between the "ct" vs "lt" formats is that the "lt" variant stores all components of date and time as a list for you to access. Overall, we recommend sticking with the "Date" format to avoid confusion. You should only use the POSIX formats if you absolutely need to account for time and time zones. For a much more in-depth discussion of dates, please refer to this [link](https://www.stat.berkeley.edu/~s133/dates.html).
 
 ### Conversion of data types
 
@@ -220,7 +220,7 @@ as.numeric(as.character(fac))
 
 The example shows that `as.numeric()` only returns the numeric order of your factor levels and not the numeric values. For instances when you want the actual numeric values themselves, you must first convert the factor to a character value and *then* to numeric values. Although this seems convoluted, there are instances when you care only for the numeric levels and not your numeric values (e.g., summarizing a large range of numeric values).
 
-Converting dates is even more quirky: I will discuss the conversion of character values to dates here
+Converting dates is even more quirky: we will discuss the conversion of character values to dates here
 
 ```{r converting dates}
 # Converting dates
@@ -232,16 +232,16 @@ as.POSIXlt("2000-01-01")
 as.POSIXct("2000-01-01 13:10:30")
 as.POSIXct("2000-01-01 13:10:30", tz = "America/Los_Angeles")
 # For a list of time zones, see the "TZ database name" column in this [table](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
-# Again, I recommend reading through this much more [indepth guide](https://www.stat.berkeley.edu/~s133/dates.html)
+# Again, we recommend reading through this much more [indepth guide](https://www.stat.berkeley.edu/~s133/dates.html)
 ```
 
-The easiest option is when your date data is already in year-month-day format, as that is the default format for these conversion functions. If it is not, then you can refer to the [`lubridate` section](#dates) or define your date/time format manually in the `format =` argument of these functions (consult the ?strptime function for available styles). For a list of time zones to use in the `tz` argument, refer to the "TZ database name" column of this [table](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). For those interested in understanding more about dates in base R, please refer to this much more in-depth [discussion](https://www.stat.berkeley.edu/~s133/dates.html). 
+The easiest option is when your date data is already in year-month-day format, as that is the default format for these conversion functions. If it is not, then you can refer to the [`lubridate` section](#dates) or define your date/time format manually in the `format =` argument of these functions (consult the ?strptime function for available styles). For a list of time zones to use in the `tz` argument, refer to the "TZ database name" column of this [table](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). For those interested in understanding more about dates in base R, please refer to this much more in-depth [discussion](https://www.stat.berkeley.edu/~s133/dates.html).
 
-For most users, I recommend simply familiarizing yourself with the `lubridate` package, discussed in the [Dates section of this document](#dates), which simplifies working with dates in R.
+For most users, we recommend simply familiarizing yourself with the `lubridate` package, discussed in the [Dates section of this document](#dates), which simplifies working with dates in R.
 
 ### Extracting, `$`, `[]`, and `[[]]` {#extraction}
 
-The section is a bit abstract but is instrumental for programming in R. Objects in R can be made up of underlying parts. A vector object is made up of a combination of individual values; a data frame is made up of a combination of columns; a column is made up of a combination of values in each row (a vector); etc. R provides three main ways to extract these underlying parts: the `$`, `[]`, and `[[]]` operators. 
+The section is a bit abstract but is instrumental for programming in R. Objects in R can be made up of underlying parts. A vector object is made up of a combination of individual values; a data frame is made up of a combination of columns; a column is made up of a combination of values in each row (a vector); etc. R provides three main ways to extract these underlying parts: the `$`, `[]`, and `[[]]` operators.
 
 The `$` operator is used to access a *named* underlying part of an object. For example to access the named `columnNameA` in the data frame below:
 
@@ -312,11 +312,11 @@ The `file.path()` option is much cleaner, in that the arguments are simply the f
 
 ## Reading in data files
 
-R can read in many different data formats, with the most common being Excel, text, and csv files. I will present the tidyverse variants below, but there are base R variants as well. Before any analysis, the user should fully understand if their datasets have been read in correctly. 
+R can read in many different data formats, with the most common being Excel, text, and csv files. we will present the tidyverse variants below, but there are base R variants as well. Before any analysis, the user should fully understand if their datasets have been read in correctly.
 
 ### Column formats
 
-The formats of your data columns after reading into R may be different from what you intended. This is because R takes a best guess based on the data structure it sees before reading in your data. For example, if you have a column that has many missing data points at the beginning of your dataset, R may read it in as a logical column (many `FALSE` entries). Due to this uncertainty, you should explicitly tell R how to read each of your columns. 
+The formats of your data columns after reading into R may be different from what you intended. This is because R takes a best guess based on the data structure it sees before reading in your data. For example, if you have a column that has many missing data points at the beginning of your dataset, R may read it in as a logical column (many `FALSE` entries). Due to this uncertainty, you should explicitly tell R how to read each of your columns.
 
 For the tidyverse functions that will be discussed in subsequent sections, this is controlled by specifying the `col_only()` function in the `col_type =` argument. The possible values can be found in the `col_only()` help page:
 
@@ -325,8 +325,8 @@ library(readr) # part of the core tidyverse package
 ?cols_only()
 
 # Example of usagee:
-read_csv("fileName.csv", 
-         col_types = 
+read_csv("fileName.csv",
+         col_types =
            col_only(
              Date = col_date(),
              Year = col_double()
@@ -340,7 +340,7 @@ read_csv("fileName.csv",
 # These 5 formats are generally the most common read types, with col_guess() being the default
 ```
 
-The `col_only()` is a function that outputs the necessary formats required by the `col_type()` argument in various tidyverse read verbs, i.e.,, all the read sections below except for the Access section. Although this seems as an extra step, I believe it is a best practice to learn as you do not want to risk perpetuating an error that stems from the very beginning of your analysis.
+The `col_only()` is a function that outputs the necessary formats required by the `col_type()` argument in various tidyverse read verbs, i.e.,, all the read sections below except for the Access section. Although this seems as an extra step, we believe it is a best practice to learn as you do not want to risk perpetuating an error that stems from the very beginning of your analysis.
 
 ### Reading from Excel
 
@@ -377,7 +377,7 @@ Data can be read directly from the website if it is in a table format. The easie
 
 ```{r reading from a website, eval=F}
 # This read depends on this URL not ever breaking!
-# I want to pull flow gauge data from a USGS gauge in Middle River (11312676)
+# we want to pull flow gauge data from a USGS gauge in Middle River (11312676)
 # The URL is simply used in the "path" argument of the read_delim function
 read_delim("https://www.ndbc.noaa.gov/view_text_file.php?filename=46026h1993.txt.gz&dir=data/historical/stdmet/")
 ```
@@ -451,7 +451,7 @@ You should default to using these formats whenever possible for consistency and 
 
 ### Running an R script
 
-An entire R script can be run from another, separate R script using the `source()` function. 
+An entire R script can be run from another, separate R script using the `source()` function.
 
 ```{r loading an R script, eval=F}
 source("filePath.R")
@@ -461,21 +461,21 @@ The function requires you to specify the file path to your R script. From there,
 
 ## Writing data files in R
 
-This section will somewhat mirror the previous section on reading in data into R, however, I will not talk about writing to Access here. R supports writing to many different file types, such as Excel, text (csv), and its two native formats, RDS and RDA.
+This section will somewhat mirror the previous section on reading in data into R, however, we will not talk about writing to Access here. R supports writing to many different file types, such as Excel, text (csv), and its two native formats, RDS and RDA.
 
 ### Writing to Excel
 
 ```{r writing to Excel, eval=F}
-# Note that this is a separate package required to read an excel file. 
+# Note that this is a separate package required to read an excel file.
 library(writexl)
-write_xlsx(x = yourObject, 
+write_xlsx(x = yourObject,
            path = "whereYouWantToSave\fileName.xlsx")
 # Note that the file name is also specified in the path argument! Also note that the file extension must be provided--if not provided, the file will still be written correctly, but your operating system may not understand to open it in Excel.
 ```
 
 ### Writing to a text file
 
-There are functions in base R to write text files, but the `readr` versions are faster, will never write row names, and will always use "UTF-8" encoding (decreases the chances of encoding errors). Since you will likely be using this package to read in data, I am recommending that you use the writing functions from this package.
+There are functions in base R to write text files, but the `readr` versions are faster, will never write row names, and will always use "UTF-8" encoding (decreases the chances of encoding errors). Since you will likely be using this package to read in data, we recommend that you use the writing functions from this package also.
 
 ```{r writing to text, eval=F}
 # This code will not be evaluated in this document.
@@ -495,11 +495,11 @@ Covered in the writing a text file section [above](#writingToText)
 
 ### Writing to RDS and RDA
 
-Again, these are my preferred formats. The advantages are the same as previously described in the reading section: 1) your dataset can be compressed to save on disk space, 2) fast read speed into R, 3) any R object can be saved and not just data tables, and very importantly 4) the data structure for your object(s) is preserved.
+Again, these are our preferred formats. The advantages are the same as previously described in the reading section: 1) your dataset can be compressed to save on disk space, 2) fast read speed into R, 3) any R object can be saved and not just data tables, and very importantly 4) the data structure for your object(s) is preserved.
 
 ```{r writing to RDS and RDA, eval=F}
 # Writing RDS
-saveRDS(object = yourObject, 
+saveRDS(object = yourObject,
         file = "filePath\fileName.rds",
             compress = T)
 # You can set compress = F to speed up the writing process if disk space is not an issue. The speed improvement can be significant for larger databases
@@ -509,7 +509,7 @@ save.image(file = "filePath\fileName.rda")
 # The `save.image()` function is a shortcut to save the ENTIRE current environment. Therefore, this method requires you to be mindful of extraneous objects that you may not need to save into the image.
 
 # The more general form of saving an rda file is:
-save(yourObject1, yourObject2, etc, 
+save(yourObject1, yourObject2, etc,
      file = "filePath\fileName.rda")
 # The arguments here can be slightly confusing. Your first arguments are all of the objects from your environment that you would want to save. In this example, yourObject1, yourObject2, etc are the objects to be saved.
 ```
@@ -520,7 +520,7 @@ The following is formatted like a cheatsheet on how to acomplish various data op
 
 ### Base R vs 'tidyverse'
 
-Before I get into the data manipulation operations, I have to touch on this debate on base R vs 'tidyverse'. These are two main schools of coding in R. Base R refers to the coding infrastructure that is available immediately after installing the program; while tidyverse is "an opinionated collection of R packages" that introduces alternate and independent infrastructures to coding in R (tidyverse.org). It is my opinion that climbing the learning wall of R is much easier with tidyverse than base R. The main advantage is that the grammar and syntax of the tidyverse approach reads like an English sentence and is much more intuitive. As such, the operations below will be primarily in tidyverse but feel free to explore other approaches, such as base R or `data.table`. At the end of the day, everyone will have their own preferred style for coding--the list I provide below are my preference and may not be the absolutely best approach. You can load the tidyverse packages via:
+Before we get into the data manipulation operations, we would like to touch on this debate on base R vs 'tidyverse'. These are two main schools of coding in R. Base R refers to the coding infrastructure that is available immediately after installing the program; while tidyverse is "an opinionated collection of R packages" that introduces alternate and independent infrastructures to coding in R (tidyverse.org). It is our opinion that climbing the learning wall of R is much easier with tidyverse than base R. The main advantage is that the grammar and syntax of the tidyverse approach reads like an English sentence and is much more intuitive. As such, the operations below will be primarily in tidyverse but feel free to explore other approaches, such as base R or `data.table`. At the end of the day, everyone will have their own preferred style for coding--the list we provide below are our preference and may not be the absolutely best approach. You can load the tidyverse packages via:
 
 ```{r tidyverse load, eval=F}
 library(tidyverse)
@@ -528,14 +528,14 @@ library(tidyverse)
 
 ### The pipe {#pipe}
 
-The pipe assignment is a tool used to link several operations together in R. There are two main variants, one from base R and one from tidyverse. Although both tries to accomplish the same linking mechanism, their approach is slightly different. I cannot go into details on these differences as I have yet to extensively use the base R variant. Instead, I will first discuss the general concept of both and then describe the specifics of the tidyverse variant.
+The pipe assignment is a tool used to link several operations together in R. There are two main variants, one from base R and one from tidyverse. Although both tries to accomplish the same linking mechanism, their approach is slightly different. we cannot go into details on these differences as we have yet to extensively use the base R variant. Instead, we will first discuss the general concept of both and then describe the specifics of the tidyverse variant.
 
 ```{r pipes}
 # The native pipe in base R is "|>" (R version 4.0.0 +)
 c(1, 2, 3, 4, 5) |>
   sum()
 # The pipe in tidyverse is "%>%"
-c(1, 2, 3, 4, 5) %>% 
+c(1, 2, 3, 4, 5) %>%
   sum()
 ```
 
@@ -544,14 +544,14 @@ As you can see, the pipe connects two operations together, here 1) the combinati
 Specifically for tidyverse, the state of the data frame is stored as a `.` variable during the piping operation.
 
 ```{r pipe tidyverse}
-c(1, 2, 3, 4, 5) %>% 
+c(1, 2, 3, 4, 5) %>%
   sum()
 # This is the same as:
-c(1, 2, 3, 4, 5) %>% 
+c(1, 2, 3, 4, 5) %>%
   sum(.)
 # The `.` is the state of the underlying data frame at THAT step in the pipe. Here, `.` represents the state of the data frame after the first `c()` step. This essentially is saying apply sum() to the current state of the data frame, `.`.
-c(1, 2, 3, 4, 5) %>% 
-  sum(.) %>%  
+c(1, 2, 3, 4, 5) %>%
+  sum(.) %>%
   {10 * .} # the bracket here is required if you want to call on the data frame itself. This is a bit naunced but is useful for more advanced applications
 
 # Overall, the evolution of the data operations here is: 1) combination of values 1, 2, 3, 4, 5; 2) summation of that vector; and 3) multiplying that summation by 10
@@ -559,11 +559,11 @@ c(1, 2, 3, 4, 5) %>%
 # You can see the syntax of this approach is similar to an English sentence. You start with a "noun", which is your data frame here. To that noun, you will introduce various "verbs" that will modify the state of your noun. The more verbs you introduce, the more states your noun changes. tidyverse does a good job at choosing function names that are intuitive to understand, e.g., select(), filter(), rename(), etc.
 ```
 
-Generally, you will NOT need to manually specify the `.` during a tidyverse piping operation as the infrastructure has been developed to handle that for you (for those curious, `.` is treated as the first argument of the next function). As you become more familiar with the pipe, you will naturally understand how the object is being manipulated throughout the process (the `.`) which will open up the possible operations available to you. For now, it is sufficient to realize that pipes exist and many users utilize them in their code. Finally, I do not know the consequences of mixing the native pipe `|>` with the `%>%` and can only recommend sticking with `%>%` for now. Additionally examples of this piping structure can be found in the following sections.
+Generally, you will NOT need to manually specify the `.` during a tidyverse piping operation as the infrastructure has been developed to handle that for you (for those curious, `.` is treated as the first argument of the next function). As you become more familiar with the pipe, you will naturally understand how the object is being manipulated throughout the process (the `.`) which will open up the possible operations available to you. For now, it is sufficient to realize that pipes exist and many users utilize them in their code. Finally, we do not know the consequences of mixing the native pipe `|>` with the `%>%` and can only recommend sticking with `%>%` for now. Additionally examples of this piping structure can be found in the following sections.
 
 ### Concatenation (Combining objects)
 
-The function `c()` is part of base R and is used to combine objects together. The "c" stands for combine or concatenate depending on who you ask. I like the simpler verb "combine". This function is flexible and can combine values into vectors or vectors into longer vectors.
+The function `c()` is part of base R and is used to combine objects together. The "c" stands for combine or concatenate depending on who you ask. we like the simpler verb "combine". This function is flexible and can combine values into vectors or vectors into longer vectors.
 
 ```{r combining values}
 # Combine values into vector
@@ -623,7 +623,7 @@ The `paste0()` function simply connects characters and strings together, leaving
 
 ### Dates {#dates}
 
-Date is a complicated topic in R, but the `lubridate` package helps to simplify this process a bit. The package offers many functionalities, from parsing character values into dates to extracting data from dates. Although `lubridate` is a tidyverse package, it is not a core package and must be loaded separately. 
+Date is a complicated topic in R, but the `lubridate` package helps to simplify this process a bit. The package offers many functionalities, from parsing character values into dates to extracting data from dates. Although `lubridate` is a tidyverse package, it is not a core package and must be loaded separately.
 
 ```{r lubridate parsing}
 library(lubridate)
@@ -635,13 +635,13 @@ ymd(c("2002/1/31", "2002/2/28", "2002/3/31"))
 ymd_hms("2002-01-31 13:30:15", tz = "America/Los_Angeles")
 ```
 
-If you have trouble parsing date and time data into R in the reading step, you can read the column in as characters and then use `lubridate` to parse the column into the dates format. The general abbreviations for these parsing functions is inuitive with y = year, m = month, d = day, h = hour, m = minute, and s = second. 
+If you have trouble parsing date and time data into R in the reading step, you can read the column in as characters and then use `lubridate` to parse the column into the dates format. The general abbreviations for these parsing functions is inuitive with y = year, m = month, d = day, h = hour, m = minute, and s = second.
 
 After parsing the data, you can calculate components of the date and time:
 
 ```{r lubridate calculations}
-# Start off with a df of dateTime in character format, parse it correctly, then calculate various metrics. The data.frame() and mutate() functions will be discussed in more details in subsequent sections, but I am using them here for brevity
-data.frame(dateTime = c("2002-01-31 13:30:15", "2002-02-01 15:30:15", "2002-01-31 17:30:15")) %>% 
+# Start off with a df of dateTime in character format, parse it correctly, then calculate various metrics. The data.frame() and mutate() functions will be discussed in more details in subsequent sections, but we are using them here for brevity
+data.frame(dateTime = c("2002-01-31 13:30:15", "2002-02-01 15:30:15", "2002-01-31 17:30:15")) %>%
   mutate(dateTime = ymd_hms(dateTime, tz = "America/Los_Angeles"),
          year = year(dateTime),
          month = month(dateTime, label = T, abbr = F),
@@ -656,7 +656,7 @@ These functions make it very simple to extract specific time information from yo
 
 ### Matching
 
-There are instances when you want to compare range of values to a specific value to find instances of match. There are two main ways to do this in R: `==` and `%in%`. 
+There are instances when you want to compare range of values to a specific value to find instances of match. There are two main ways to do this in R: `==` and `%in%`.
 
 ```{r matching}
 # 1:10 is a shortcut indicating a vector for all integers from 1 through 10
@@ -668,7 +668,7 @@ There are instances when you want to compare range of values to a specific value
 1:10 %in% c(1, 3, 5, 7, 9)
 ```
 
-In both instances above, matches are detected. However, the answers are different between the two matches. This is because `==` is a stricter match than `%in%`. Specifically, `==` requires the two matching vectors to be the same length or for the shorter vector to be a multiple of the longer length (here, the right vector is half the length of the left vector). If one vector *is* shorter, then it is replicated to match the same length as the longer vector; from there, the values from each vector is matched on *an indexed* basis (e.g., value in 1st position is matched with one another). This is why only the first value is returned as `TRUE`: 
+In both instances above, matches are detected. However, the answers are different between the two matches. This is because `==` is a stricter match than `%in%`. Specifically, `==` requires the two matching vectors to be the same length or for the shorter vector to be a multiple of the longer length (here, the right vector is half the length of the left vector). If one vector *is* shorter, then it is replicated to match the same length as the longer vector; from there, the values from each vector is matched on *an indexed* basis (e.g., value in 1st position is matched with one another). This is why only the first value is returned as `TRUE`:
 
 ```{r matching == example}
 # The left vector
@@ -703,7 +703,7 @@ Everything discussed so far are also applicable to negative matching in R. There
 # The position of "!" should be noted. It goes before at the beginning of the match. However, do not parenthesize as !(1 %in% 2) means a slightly different thing (match 1 %in% 2 first, then simply negate that answer)
 ```
 
-Overall, I would recommend *always* using the `%in%` function over the `==` unless you want an *exact* match, e.g., matching a single value. Although the negative form is slightly less intuitive, the flexibility of `%in%` is worth it.
+Overall, we would recommend *always* using the `%in%` function over the `==` unless you want an *exact* match, e.g., matching a single value. Although the negative form is slightly less intuitive, the flexibility of `%in%` is worth it.
 
 ### Basic statistic functions
 
@@ -782,9 +782,9 @@ data.frame(columnNameA = c(5, 6, 7),
 
 # Then, you can create a new column and/or change the existing column
 data.frame(columnNameA = c(5, 6, 7),
-           columnNameB = c("A", "B", "C")) %>% 
+           columnNameB = c("A", "B", "C")) %>%
   # add in a new column
-  mutate(columnNameC = c("D", "E", "F")) %>% 
+  mutate(columnNameC = c("D", "E", "F")) %>%
   # changing existing column
   mutate(columnNameA = c(8, 9, 10))
 
@@ -792,7 +792,7 @@ data.frame(columnNameA = c(5, 6, 7),
 
 # To keep the code neat and short, you should take advantage of being able to place multiple mutates in the same function, with each operation separated by a comma
 data.frame(columnNameA = c(5, 6, 7),
-           columnNameB = c("A", "B", "C")) %>% 
+           columnNameB = c("A", "B", "C")) %>%
   # add in a new column
   mutate(columnNameC = c("D", "E", "F"),
          # Changing existing column
@@ -800,7 +800,7 @@ data.frame(columnNameA = c(5, 6, 7),
 
 # There is an order of operations if you have multiple mutates in the same function. This allows you to mutate a column based on values of a recently added column
 data.frame(columnNameA = c(5, 6, 7),
-           columnNameB = c("A", "B", "C")) %>% 
+           columnNameB = c("A", "B", "C")) %>%
     # add in a new column
     mutate(columnNameC = c("D", "E", "F"),
            # Changing existing column
@@ -823,17 +823,17 @@ data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
            columnNameC = c("D", "E", "F"))
 
-# From the original data frame, I only want column A and C
+# From the original data frame, we only want column A and C
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   select(columnNameA, columnNameC)
-# This selects for column A and B in the original data frame  
+# This selects for column A and B in the original data frame
 
 # Another way to do this is to remove column B
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   select(-columnNameB)
 # To remove the column, simply use a `-` before the column of interest
 ```
@@ -844,7 +844,7 @@ During this selection process, you can also choose to input a new name(s) for yo
 # The select function accomodates a column name change as well
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   select(newColumn = columnNameA)
 ```
 
@@ -855,7 +855,7 @@ The `transmute()` function is a tidyverse function that combines `mutate()` and 
 ```{r transmute}
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   # create a new column D and remove column B
   transmute(columnNameA,
             columnNameC,
@@ -866,12 +866,12 @@ data.frame(columnNameA = c(5, 6, 7),
 
 ### Ifelse() and case_when()
 
-When creating your columns, you may need to employ conditional programming. There are two main methods for doing this, one in base R and one in tidyverse. I will go over the base R one first given that it is the more commonly used variant: the `ifelse()` function.
+When creating your columns, you may need to employ conditional programming. There are two main methods for doing this, one in base R and one in tidyverse. we will go over the base R one first given that it is the more commonly used variant: the `ifelse()` function.
 
 ```{r if else statements}
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   mutate(columnNameD = ifelse(columnNameA %in% c(5, 6) & columnNameB %in% "A",
                               "trueMatch", "falseMatch"))
 # NOTE: ifelse may not retain formatting information, such as with dates. You can use the if_else() tidyverse variant to preserve formatting if you run into this issue.
@@ -884,7 +884,7 @@ For instances when you want to have more than only two outputs, you can use `cas
 ```{r tidyverse case_when}
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   mutate(columnNameD = case_when(columnNameA %in% c(5, 6) & columnNameB %in% "A" ~ "trueMatch1",
                                  columnNameA %in% c(5, 6) ~ "trueMatch2",
                                  TRUE ~ "remainingRows"))
@@ -895,12 +895,12 @@ The tilde (`~`) is used to specify the output matching your condition(s). The ma
 
 ### Renaming columns
 
-There are several ways to change the names of the columns in a data frame. I will introduce both the tidyverse and base R solutions, as there is utility to both approaches. In tidyverse, there are renaming opportunities in many selection functions (e.g., mutate, select, transmute, and group_by), but `rename()` is the explicit function for this operation.
+There are several ways to change the names of the columns in a data frame. we will introduce both the tidyverse and base R solutions, as there is utility to both approaches. In tidyverse, there are renaming opportunities in many selection functions (e.g., mutate, select, transmute, and group_by), but `rename()` is the explicit function for this operation.
 
 ```{r tidyverse rename}
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   rename(newA = columnNameA,
          newC = columnNameC, # Although this is inputted as the 2nd argument in rename, the column position is unchanged
          newB = columnNameB)
@@ -939,7 +939,7 @@ Filtering data involves several layers: 1) what data frame are you starting in, 
 # This can be done using the `filter()` function from tidyverse.
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   filter(columnNameA %in% 6)
 # We wanted to filter rows where columnNameA is equal to 6. ALL columns are returned
 ```
@@ -949,7 +949,7 @@ The `filter()` function here looks for rows that satisfy our filter. In other wo
 ```{r filter multiple}
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   filter(columnNameA %in% 6,
          columnNameC %in% "E")
 # Here, we have two filter conditions, a row with a value of A that is 6 and a value of C that is "E"
@@ -957,14 +957,14 @@ data.frame(columnNameA = c(5, 6, 7),
 # Separate conditions in `filter()` is separated by commas. This is the same as replacing each comma with `&`, the "and" qualifier
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   filter(columnNameA %in% 6 & columnNameC %in% "E")
 # However, this visually is less clear than using the commas
 
 # Another important qualifer is `|`, which represents `or`
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
+           columnNameC = c("D", "E", "F")) %>%
   filter(columnNameA %in% 6 | columnNameC %in% "F")
 # Since we are using the `or` qualifier, all matches to our conditions are returned; here, two rows in our data frame
 ```
@@ -1002,8 +1002,8 @@ There are times when you want to add rows to a data frame. In these cases, you a
 # One data frame
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
-           columnNameC = c("D", "E", "F")) %>% 
-  # To this original data frame, you want to add 2 more rows 
+           columnNameC = c("D", "E", "F")) %>%
+  # To this original data frame, you want to add 2 more rows
   bind_rows(data.frame(columnNameA = c(50, 60),
                        columnNameB = c("Y", "Z"),
                        columnNameD = c("1A", "2B")))
@@ -1052,9 +1052,52 @@ full_join(df1, df2,
 # Note that the names share the same quotation to specify that they are the same column across the two data frames!
 ```
 
-There are other joins, such as `right_join()`, `anti_join()`, and `semi_join()`, but I will not cover them here as they are special cases that are rarely used. You can consult their help page, as their intuition is same as the joins discussed here.
+There are other joins, such as `right_join()`, `anti_join()`, and `semi_join()`, but we will not cover them here as they are special cases that are rarely used. You can consult their help page, as their intuition is same as the joins discussed here.
 
-### Pivoting dfs
+### Data structure
+
+A data structure optimized for data storage may not be the optimal structure for data analysis. Specifically, the CDFW surveys are stored as relational databases, which is a collection of data tables that are connected to one another across shared columns following predefined relationships. Before data analysis, you must first resolve these relationships using various data joins, filters, selects, and overall manipulations (operations outlined in this guide). This crafting process can be tricky. The structure of your final data frame will dictate both the types of analysis you can do and how easy it will be to carry out those analyses. Although there are various approaches, we recommend the tidyverse's approach of creating your data frame in a "tidy" format.
+
+#### Tidy data
+
+There are 3 rules which define the tidy format:
+
+1. Each variable must have its own column.
+2. Each observation must have its own row.
+3. Each value must have its own cell.
+
+![Following three rules makes a dataset tidy. Variables are in columns, observations are in rows, and values are in cells. Taken from Figure 12.1 in R for Data Science, https://r4ds.had.co.nz/tidy-data.html#fig:tidy-structure](tidy-1.png)
+
+Two main benefits of this approach are 1) you are following a standardized way to structure your dataset that is interpretable across data users and 2) you can effectively utilize the functions within the tidyverse package. Data frames that do not satisfy these three rules would be considered "non-tidy" data. Here's an example:
+
+```{r messy}
+data.frame(Date = rep("9/4/2009", 4),
+           Station = c(410, 504, 601, 802),
+           Secchi = c(0.88, 0.78, 0.95, 0.91),
+           AmericanShad = c(5, 18, 34, 1),
+           LongfinSmelt = c(1, 0, 2, 5))
+```
+
+This is non-tidy data because the columns `American Shad` and `Longfin Smelt` are arranged as separate columns (i.e., variables), when, in fact, they actually contain values of the same variable, `species`. This is problematic because your variables are housed and must be called in three different ways: 1) as columns (Date, Station, Secchi), 2) as headers (AmericanShad, LongfinSmelt), and 3) as values (catch counts). This is an issue for regression analysis in R, for example, where the predictor and response variables must all be in their own columns.
+
+This data frame can be made into the tidy format via `pivot_longer()`, discussed in ["Pivoting dfs"](#pivoting):
+
+```{r tidy}
+data.frame(Date = rep("9/4/2009", 4),
+           Station = c(410, 504, 601, 802),
+           Secchi = c(0.88, 0.78, 0.95, 0.91),
+           AmericanShad = c(5, 18, 34, 1),
+           LongfinSmelt = c(1, 0, 2, 5)) %>%
+  pivot_longer(c(AmericanShad, LongfinSmelt),
+               names_to = "Species",
+               values_to = "Catch")
+```
+
+In this form, all variables are now their own columns and you have a consistent and single way to refer to each of your variables (as columns). This is now a tidy dataset as variables are in columns, observations are in rows, and values are in cells. Continuing with our example, a regression analysis in which the response variable is catch across multiple species is now possible. This tidy form also allows you to easily leverage other tidyverse verbs to further manipulate your dataset for additional analyses, e.g., `filter()`, `arrange()`, `rename()`, `select()`, etc.
+
+For CDFW survey data, we highly recommend you provide all flatfiles and data be provided in the tidy format (or at least provide another copy in tidy format) to facilitate a more ready-to-use product for the end users. Again, the relational database structure is optimized for data storage and not for data analysis; a tidy format reduces the data wrangling required from the end users, saving users front-end work *and* reduces the potential for introduced errors caused by users who are less familiar with the data.
+
+### Pivoting dfs {#pivoting}
 
 You can transpose your data frames into "longer" or "wider" data frames. To pivot to a longer data frame, you can use `pivot_longer()`:
 
@@ -1064,20 +1107,20 @@ data.frame(year = c(2000, 2005, 2010),
            DS = c(100, 50, 10),
            CHN = c(500, 250, 50),
            LFS = c(100, 500, 100),
-           GS = c(50, 30, 10)) 
+           GS = c(50, 30, 10))
 # We can pivot this data frame to retain all catch data across all species in two columns, 1 with the species name and the other the count
 data.frame(year = c(2000, 2005, 2010),
            DS = c(100, 50, 10),
            CHN = c(500, 250, 50),
            LFS = c(100, 500, 100),
-           GS = c(50, 30, 10)) %>% 
+           GS = c(50, 30, 10)) %>%
   pivot_longer(-year,
                names_to = "species",
                values_to = "catch")
 # Do note that the names_to and values_to must be quoted as these are the variable names for the new columns
 ```
 
-The arguments of `pivot_longer()` begin with what columns will be aggregated by the pivot. Here, I am negating the year column, which essentially says to pivot all columns other than `year`. You could theoretically do `c(DS, CHN, LFS, GS)` as well, but that is less effecient and is restrictive if additional catch columns are added after your code.
+The arguments of `pivot_longer()` begin with what columns will be aggregated by the pivot. Here, we are negating the year column, which essentially says to pivot all columns other than `year`. You could theoretically do `c(DS, CHN, LFS, GS)` as well, but that is less effecient and is restrictive if additional catch columns are added after your code.
 
 The opposite operation is to pivot a long data frame wider with `pivot_wider()`:
 
@@ -1087,10 +1130,10 @@ data.frame(year = c(2000, 2005, 2010),
            DS = c(100, 50, 10),
            CHN = c(500, 250, 50),
            LFS = c(100, 500, 100),
-           GS = c(50, 30, 10)) %>% 
+           GS = c(50, 30, 10)) %>%
   pivot_longer(-year,
                names_to = "species",
-               values_to = "catch") %>% 
+               values_to = "catch") %>%
   pivot_wider(names_from = "species",
               values_from = "catch")
 # This gets us back to the original data frame. The only difference is because this is a tidyverse verb, the output is a "tibble" instead of a data frame (but functionally both are the same in nearly all cases)
@@ -1106,13 +1149,13 @@ There are instances when you want to calculate a summary statistics for your dat
 data.frame(columnNameA = c(5, 6, 7),
            columnNameB = c("A", "B", "C"),
            columnNameC = c(8, 9, 10),
-           columnNameD = c(11, 12, 13)) %>% 
+           columnNameD = c(11, 12, 13)) %>%
   summarize(totalColumnNameA = sum(columnNameA),
             meanColumnC = mean(columnNameC),
             medianColumNameD = median(columnNameD))
 ```
 
-You can do this using the `summarize()` function from tidyverse. As the name suggests, this function will return to you a *summary* data table of the operations you are asking for--this summary table is important as it means the dimensions of your data frame is changed. The argument format of the function is similar to `mutate()` and supports a wide range of functions. For this specific example, I am asking for the total sum of `columnNameA`, mean of `columnNameC`, and the median of `columnNameD`. The returned table is a simple table with one row as you are asking for the *summary* statistics across the entire dataset. You should also note that the function only keeps the columns that are you making calculations for, i.e., `columnNameB` is not in the final data frame (if you wanted this column to be preserved, use mutate instead).
+You can do this using the `summarize()` function from tidyverse. As the name suggests, this function will return to you a *summary* data table of the operations you are asking for--this summary table is important as it means the dimensions of your data frame is changed. The argument format of the function is similar to `mutate()` and supports a wide range of functions. For this specific example, we are asking for the total sum of `columnNameA`, mean of `columnNameC`, and the median of `columnNameD`. The returned table is a simple table with one row as you are asking for the *summary* statistics across the entire dataset. You should also note that the function only keeps the columns that are you making calculations for, i.e., `columnNameB` is not in the final data frame (if you wanted this column to be preserved, use mutate instead).
 
 ### Groups
 
@@ -1126,14 +1169,14 @@ df <- data.frame(date = seq(as.Date("2020-01-01"), as.Date("2020-12-01"),
            species = c(rep("DS", 3), rep("CHN", 3), rep("LFS", 3), rep("GST", 3)),
            catch = rep(sample(50:1000, 12)))
 # First, we can try to group and calculate total sum of catch by date and species
-df %>% 
-  group_by(date, species) %>% 
+df %>%
+  group_by(date, species) %>%
   summarize(totalCatch = sum(catch, na.rm = T))
 # This gives you the same data frame since we are asking for per date (all unique) and species
 
 # To summarize on just species, remove date from the group_by() function:
-df %>% 
-  group_by(species) %>% 
+df %>%
+  group_by(species) %>%
   summarize(totalCatch = sum(catch, na.rm = T))
 ```
 
@@ -1141,16 +1184,16 @@ The `group_by()` function only creates the grouping structure for your dataset c
 
 ```{r grouping extended}
 # mutate() can be used; the resulting operation will simply add a column to your df, but not that the values are repeated. All rows are kept in this instance and in certain situations, this is appropriate over "summarize()"
-df %>% 
-  group_by(species) %>% 
+df %>%
+  group_by(species) %>%
   mutate(totalCatch = sum(catch, na.rm = T))
 # count() can be used to get number of instances
-df %>% 
-  group_by(species) %>% 
+df %>%
+  group_by(species) %>%
   count()
 # or use add_count in instances where you don't want to summarize the data
-df %>% 
-  group_by(species) %>% 
+df %>%
+  group_by(species) %>%
   add_count()
 ```
 
@@ -1158,27 +1201,27 @@ After your calculations, it is best practice to remove your groupings. This is t
 
 ```{r ungroup}
 # First to check if your data is grouped:
-df %>% 
-  group_by(species) %>% 
+df %>%
+  group_by(species) %>%
   groups()
 
 # The first method is to define a new group before your next calculation:
-df %>% 
-  group_by(date, species) %>% 
-  summarize(totalCatch = sum(catch, na.rm = T)) %>% 
-  group_by(species) %>% 
+df %>%
+  group_by(date, species) %>%
+  summarize(totalCatch = sum(catch, na.rm = T)) %>%
+  group_by(species) %>%
   summarize(totalCatch = sum(totalCatch, na.rm = T))
 # Note the use of "totalCatch" in the sum() function in the second summarize. This is due to the creation of this variable in the first summarize which is then piped into this new summrize and grouping.
 
 # The second method is to use ungroup() after your calculations
-df %>% 
-  group_by(species) %>% 
-  count() %>% 
+df %>%
+  group_by(species) %>%
+  count() %>%
   ungroup()
 
 # The third method particular to certain verbs only, mainly "summarize()"
-df %>% 
-  group_by(date, species) %>% 
+df %>%
+  group_by(date, species) %>%
   summarize(totalCatch = sum(catch, na.rm = T),
             .groups = "drop")
 # The ".groups" argument in summarize() allows you to specify how to handle groups, with "drop" used to remove them.
@@ -1188,17 +1231,18 @@ Overall, the grouping procedure in tidyverse is composed of three major steps. F
 
 ### Plotting
 
-Base R contains its own visualization infrastructure, however, I work primarily in `ggplot2`, a tidyverse alternative. User preference generally comes down to which method they learned; both methods have specialized and distinct approaches, so users generally stick with one or the other. The `ggplot2` method builds on the concept of piping that you should be familiar with if you are a tidyverse user.
+Base R contains its own visualization infrastructure, however, we work primarily in `ggplot2`, a tidyverse alternative. User preference generally comes down to which method they learned; both methods have specialized and distinct approaches, so users generally stick with one or the other. The `ggplot2` method builds on the concept of piping that you should be familiar with if you are a tidyverse user.
 
 ```{r plotting example}
 ggplot(cars, aes(x = speed, y = dist)) +
   geom_point() +
   geom_line()
+# This is the baseline theme from ggplot. It is not production ready, e.g., text too small, but ggplot is flexible and support alot of customizations. 
 ```
 
 Conceptually, when drawing a picture, you first draw the background and then add additional layers of objects. It is helpful to think of plotting in R like this. The first step is to draw the background, which are the axes of X and Y and prepare the drawing space; this is done in ggplot via the the `ggplot()` command. Within this function, you must identify which database you are using (here the `cars` example dataset from base R) and what your axes variables are in the `aes()` argument. This argument stands for aesthetics and takes several main arguments, with the two most important being your x and y axes (`x = ` and `y = `). After determining the background of your plot, you can then add the next layers. Layers are added using the `+` symbol, similar to the `%>%` operator in data manipulations. In this example, we add geometric elements (points and line) to represent the data. The order of these layers determine how they are drawn by ggplot; so, here, the points are drawn first and then the line.
 
-This layered drawing process is a critical component in understanding how ggplot works in R. This concept is the only thing I will discuss here. Obviously, there are many other features to `ggplot` that allows you to have fine control on all aspects of the figure. There are many resources online, but my two favorites are: [first example](http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html) and [second example](https://www.datanovia.com/en/blog/ggplot-examples-best-reference/).
+This layered drawing process is a critical component in understanding how ggplot works in R. This concept is the only thing we will discuss here. Obviously, there are many other features to `ggplot` that allows you to have fine control on all aspects of the figure. There are many resources online, but our two favorites are: [first example](http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html) and [second example](https://www.datanovia.com/en/blog/ggplot-examples-best-reference/).
 
 ### Lists
 

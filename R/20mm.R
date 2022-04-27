@@ -198,7 +198,7 @@ TMM <- TMM %>%
                 -FishCode, -Catch, -CatchNew,
                 -LengthFrequency) %>% 
   relocate(Notes_survey, Notes_tow, .after = last_col())
-
+stop()
 ## Save compressed data to /data:
 # usethis::use_data(TMM, TMM_measured_lengths, overwrite=TRUE)
 write_csv(TMM, file = file.path("data-raw", "20mm", "20mm.csv"))
