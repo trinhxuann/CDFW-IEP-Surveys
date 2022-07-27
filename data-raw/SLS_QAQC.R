@@ -236,15 +236,23 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
 # print = F used AFTER confirming with the visualizations that this is what you want
 
 GPSOutlying <- list()
-# GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022)
-GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022, k = 3)
-GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
-GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
-GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2, plot = F)
+GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 418, Year = 2022, k = 2)
+GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 801, Year = 2022, k = 2)
+GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 716, Year = 2022, k = 2)
+GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
+GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 906, Year = 2022, k = 2)
+GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
+GPSOutlying[[7]] <- findOutlierGPS(GPSDF, station = 915, Year = 2022, k = 2)
+# 914 for 2022 seems as though ALL tows are slightly off from the theoretical
+GPSOutlying[[8]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2)
 
 # Might be useful to plot all years data for the particular station of interest?
 
-# findOutlierGPS(GPSDF, station = 610)
+findOutlierGPS(GPSDF %>% 
+                 filter(!is.na(Lat) & !is.na(Long)), 
+               station = 914)
+# 914 has ALWAYS been towed at a different location than the theoretical...?
+
 # findOutlierGPS(GPSDF, station = 610, k = 4)
 # 
 # GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2, plot = F)
@@ -986,4 +994,4 @@ saveSheet <- lapply(outliers, function(x) mutate(x, IsOutlier = NA, ChangedTo = 
                                                  across(where(is.character), ~str_replace_all(.x, "\uFFFD", ""))))
 
 # Saving the file; this will save to the current directory, which by default is in the parent folder; will change this later
-writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "SLS", paste0("SLS_outliers_", gsub(" ", "_", now()), ".xlsx")))
+writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "SLS", paste0("SLS_outliers_", gsub(" |:", "_", now()), ".xlsx")))
