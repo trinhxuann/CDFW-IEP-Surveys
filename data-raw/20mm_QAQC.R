@@ -964,4 +964,4 @@ saveSheet <- lapply(outliers, function(x) mutate(x,
                                                  across(where(is.character), ~str_replace_all(.x, "\uFFFD", ""))))
 
 # Saving the file; this will save to the current directory, which by default is in the parent folder; will change this later
-writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "20mm", paste0("20mm_outliers_", today(), ".xlsx")))
+writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "20mm", paste0("TMM_outliers_", gsub(" |:", "_", now()), ".xlsx")))
