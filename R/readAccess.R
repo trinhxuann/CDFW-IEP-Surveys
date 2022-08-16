@@ -62,7 +62,7 @@ pullAccessDF <- function(script = c("SLS.R", "20mm", "SKT"),
 # UDrive route
 pullAccessDF(script = "SLS.R",
              bypass = T,
-             file = "U:\\NativeFish\\SmeltData\\DS-DATA\\SLS_Query.mdb",
+             file = "C:\\Users\\txnguyen\\Desktop\\SLS_Query.accdb",
              tablesReturned = c("Catch", "Lengths", "MeterCorrections",
                                 "TowInfo", "WaterInfo", "Station_Lookup"))
 

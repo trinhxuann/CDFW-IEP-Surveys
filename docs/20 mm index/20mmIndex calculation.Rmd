@@ -1,0 +1,282 @@
+---
+title: "20 mm DS Index Calculation Documentations"
+author: "Nguyen, T. X."
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 1
+    number_sections: false
+    theme: lumen
+---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+```{r setup, include=FALSE}
+# Loading libraries
+library(kableExtra)
+library(dplyr)
+library(ggplot2)
+library(ggdark)
+library(readr)
+library(lubridate)
+library(leaflet)
+library(tidyr)
+library(ggsci)
+library(purrr)
+
+options(scipen = 999, width = 80)
+
+knitr::opts_chunk$set(dpi=320, width = 150, fig.width=18, fig.height=12, warning=FALSE, message=F, dev.args = list(type = "cairo-png", pointsize = 13), echo = F)
+
+makeKable <- function(df, caption = NULL, width = "100%", height = NULL) {
+  
+  table <- kbl(df, caption = caption) %>%
+  kable_classic(full_width = T, html_font = "Cambria", "striped")
+  
+  if (!is.null(height)) {
+    height <- paste0(height, "px")
+    
+    table <- scroll_box(table, width = width, height = height)
+  }
+  table
+}
+
+myTheme <- dark_theme_bw(base_size = 24) +
+  theme(panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#2c2828", color = NA),
+        panel.background = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.grid.major = element_line(color = "#646464", size = 0.2),
+        legend.background = element_blank(),
+        legend.key = element_blank())
+
+theme_set(myTheme)
+```
+
+# Introduction
+
+The 20 mm Delta Smelt index (henceforth, Index) is an annual estimation Delta Smelt abundance published by the California Department of Fish and Wildlife (CDFW) [20 mm Survey (20 mm)](https://www.dfg.ca.gov/delta/data/20mm/indices.asp). The 20 mm samples from the eastern portion of San Pablo Bay (SPB) to Liberty Island in the north and to the State Water Project to the south on a biweekly (every two weeks) schedule. There are up to 52 stations that are sampled across this spatial extent, 41 stations that have been consistently sampled since the inception of the survey in 1995 ("indexed stations"), six stations that have been consistently sampled since 2008 located near Liberty Island ("non-indexed stations"), and five stations that are sampled only during high outflow years located in SPB ("high outflow stations") (Figure 1). There are three independent tows at each station.
+
+```{r, overall map, echo = F, results='asis', fig.cap="Figure 1. Map displaying the geographic range of work of the 20 mm Survey. Each point represents the location of a sampling station. Indexed stations are ones that have been consistently sampled since the inception of the study, non-indexed as those sampled regularly after their addition in 2008, and high outflow as those that are only sampled during high outflow water years."}
+# This file is simply the 47 stations in the StationCords.csv file + the 5 high outflow stations
+# I've added the status column myself for plotting below
+
+mapDF <- read.csv(file.path("..", "StationCords_20mmTN.csv")) %>% 
+    separate(Lat, into = c("LatD", "LatM", "LatS"), sep = " ") %>%
+    separate(Long, into = c("LonD", "LonM", "LonS"), sep = " ") %>%
+    mutate(across(c(LatD, LatM, LatS, LonD, LonM, LonS), ~as.numeric(.x)),
+           Latitude = (LatD + LatM/60 + LatS/3600),
+           Longitude = -(LonD + LonM/60 + LonS/3600),
+           Status = factor(Status,
+                           levels = c("20mmStation", "Non-Index", "HighOutflow")),
+           offsetX = case_when(Station %in% 334 ~ 10,
+                               Station %in% c(335) ~ 0,
+                               Station %in% 329 ~ -2,
+                               Station %in% 336 ~ -5,
+                                  Station %in% 328 ~ c(0),
+                                  Station %in% 723 ~ c(-18),
+                                  TRUE ~ c(18)),
+           offsetY = case_when(Station %in% c(334, 335, 336) ~ c(15),
+                               Station %in% 329 ~ 13,
+                                  Station %in% 328 ~ c(-15),
+                                  Station %in% 723 ~ c(0),
+                                  TRUE ~ c(0)))
+
+# To color the stations on the map accordingly
+# pal <- colorFactor(c("#e41a1c", "#3D8B3A", "#984ea3"), domain = c(specialStations$Status, "SLS Stations"))
+pal <- colorFactor(c("#3B4992FF", "#EE0000FF", "#008B45FF"), 
+                   domain = levels(mapDF$Status))
+
+m <- leaflet(mapDF,
+        width = "100%",
+        height = "500") %>%
+    addProviderTiles(providers$Esri.OceanBasemap) 
+
+stationList <- mapDF %>% 
+    split(., .$Station)
+
+names(stationList) %>%
+  purrr::walk(function(mapDF) {
+    m <<- m %>%
+      addCircleMarkers(data = stationList[[mapDF]],
+                       lng=~Longitude, lat=~Latitude,
+                       label = ~as.character(Station),
+                     color = ~pal(Status),
+                     radius = 6,
+                     stroke = F, fillOpacity = 0.8,
+                     labelOptions = labelOptions(noHide = T,
+                                                 offset = ~c(offsetX, offsetY),
+                                                 direction = "center",
+                                                 textOnly = T,
+                                                 textsize = "12px"))
+  })
+
+m %>%
+  addLegend(pal = pal, values = ~Status, opacity = 1)
+
+  #   addCircleMarkers(~Longitude, ~Latitude,
+  #                    label = ~as.character(Station),
+  #                    color = ~pal(Status),
+  #                    radius = 6,
+  #                    stroke = F, fillOpacity = 0.8,
+  #                    labelOptions = labelOptions(noHide = T,
+  #                                                direction = ~directions,
+  #                                                textOnly = T,
+  #                                                textsize = "12px")) %>% 
+  # addLegend(pal = pal, values = ~Status, opacity = 1)
+```
+
+# Index calculation
+
+The index is calculated as the summation of the geometric mean of catch per unit effort (CPUE) of Delta Smelt in the four surveys that border when the mean fork length of all surveyed individual crosses 20 mm (two before and after). For this calculation, only the 41 stations that have been consistently sampled since the inception of the survey are considered. Specifically:
+
+\begin{equation}
+\tag{1}
+Index = \sum_{s = 1}^{4}exp\left(\frac{1}{n}\sum_{i = 1}^{n}ln(CPUE_i + 1)\right) - 1
+\end{equation}
+
+*Where:*
+
+$CPUE_{i}$ = catch per unit effort per indexed station $i$, summarized into geometric mean per survey $s$. A 1 is added to $CPUE_{i}$ to address tows where no Delta Smelt are caught; this 1 is then removed from the final geometric mean before summation into the index.
+
+More specifically, $CPUE$ is calculated per station as:
+
+\begin{equation}
+\tag{2}
+CPUE = \frac{1}{n}\sum_{n = 1}^{n}\left({\frac{Catch_{DS_t} * 10000}{Volume_{t}}}\right)
+\end{equation}
+
+*Where:*
+
+$Catch_{DS_t}$ = total number of Delta Smelt caught in tow $t$, $Volume_{t}$ = amount of water sampled in tow $t$, and $n$ = the number of replicate tows at a station, generally 3.
+
+and $Volume_{t}$ is calculated as:
+
+\begin{equation}
+\tag{3}
+Volume_{t} = netMouthArea * (meterEnd_{t} - meterEnd_{t}) * kFactor
+\end{equation}
+
+*Where:*
+
+$netMouthArea$ = total area at the mouth of the net, measured to be 1.51 $m^2$ for the 20 mm net, $meterEnd_t$ = meter reading at the end of tow $t$, $meterStart_t$ = meter reading at the start of tow $t$, $kFactor$ = conversation factor that translate meter rotations to distance traveled, factory value of 0.026873027.
+
+# Problems with the Index calculations
+
+There are multiple calculations involved in producing the final 20 mm index, as shown in the provided equations. Inconsistencies occurring in any of these prior calculations can perpetuate an error to the final Index. The Index calculations are currently facilitated by nine Access queries. Unfortunately, the historically provided Index values cannot be exactly recreated with this suite of queries. Upon diving into the code, these inconsistencies can be due to several compounding issues.
+
+### Were calibrated k factors used to calculate the Index over the years?
+
+The k factor determines the volume of water sampled by each tow (equation 3), which in turn affects the CPUE and, thus, Index calculations, as measured by the flow meters. Originally, flow meters were calibrated in a controlled flow chamber at the UC Davis Hydraulics Laboratory (Hydro Lab) before the start of each season to determine this k factor. Beginning in 2015, the flow chamber at the Hydro Lab was decommissioned, forcing the 20 mm to use the factory provided k factor value (0.026873027) instead. To support this change, flow meters are checked at the end of every season and replaced with new meters (factory calibrated) if readings are incorrect.
+
+The current Index Access queries uses only the factory calibrated value to calculate water volume sampled. An Access database obtained from Lauren Damon dated October 28, 2015 shows that the calibrated k factor values were used in the volume calculation. From this, it appears that Index values prior to 2015 likely used the calibrated k factor values, however, there is no concrete documentation of when this change in the code occurred.
+
+### Should the index stations be used to calculate mean fork length of individuals caught in a survey?
+
+The 20 mm has 41 index stations, those that have consistently been sampled since the inception of the survey in 1995. Six additional stations were added near Liberty Island in 2008 to better document the Delta Smelt population in the Northern Delta (non-index stations). The use of these six non-index stations is inconsistent in the current index calculations. Whereas these stations are excluded in the geometric mean calculations (1), it is included in the mean fork length calculation to determine which four surveys will be used to calculate the Index. Although this can be gleamed from the Access queries, this is not documented in the metadata documentation of the survey. It is also not documented when these non-index stations were first included in the mean fork length calculation, immediately after the inception of these additional stations or some time afterwards. The decision to include these non-index stations or not can potentially affect which four surveys are used in the final Index calculation (1).
+
+### How are surveys with mean fork length > 20 mm early in the season dealt with?
+
+The Index is calculated as the summation of the four surveys that border when the mean fork length of a survey exceeds 20 mm (two before and two after). This is because the survey is aimed at catching YOY fish, of which the Index should reflect. To accomplish this, fish greater than 60 mm fork length are removed from the mean fork length calculations, across all months. In most years, this approach leads to the 20 mm threshold occurring between surveys 4-7. However, in 1998, survey 1 produced a mean fork length > 20 mm. By definition, surveys 1 and 2 should have been used to calculate the Index for 1998 (there cannot be two surveys before the first survey of the season). This was not the case and survey 1 was not used and surveys 3-6 were used instead to calculate the Index. 
+
+### How should subsampling be accounted for when calculating total catch of DS in a survey?
+
+The Index is the summation of the geometric mean of CPUEs across four surveys (1). The geometric mean of CPUE is entirely dependent on the total number of fish caught by the 20 mm in a survey. Theoretically, the 20 mm must measure all Delta Smelt captured. Unfortunately, there have been rare instances in which this was not the case and only a subsample of all Delta Smelt caught were measured. The current coding in the Access queries does not take these rare subsampling instances into account, as the total number of fish measured is used to calculate CPUE and not total number of fish caught. This results in a smaller CPUE value for instances when subsampling did occur, leading to a slightly lower Index value.
+
+### Can a tow 3 occur without a tow 2?
+
+The 20 mm theoretically samples a station with three independent tows. This can be reduced in various situations, such as very heavy samples or inaccessibility to a site. However, in all instances, a tow three should not be recorded without a tow 2 occurring beforehand. The current coding in the Access queries uses the count of number of tows instead of the max number of tows at a station to standardize CPUE. In rare instances, the database has tows 1 and 3 for a station but not 2. By the current coding, this results in $N_{tow}$ of two to standardize CPUE, however, since a tow 3 cannot occur without a tow 2, $N_{tow}$ of 3 may be the more accurate description.
+
+# Discussion of problems
+
+I held a meeting with Lauren Damon and Vanessa Mora to better understand these complications and how to remedy them going forward, either through better metadata documentation or by reworking the code or calculations.
+
+### Were calibrated k factors used to calculate the indices over the years?
+
+An older version of the database showed that the calibrated k factors were used to calculate volume prior to 2015.
+
+### Should the index stations be used to calculate mean fork length of individuals caught in a survey?
+
+This discrepancy between using index stations to calculate CPUE but both index and non-index stations to calculate mean fork length was an intentional decision by the 20 mm. The additions of the six non-index stations were made to better describe the Delta Smelt population within the Delta; as such, the inclusion of these stations in the mean calculation provided a better estimation of the growth rate of the YOY population in the system. Catch, however, remained limited to only the indexed stations to preserve the continuity of the Index, making it more comparable to the years prior to 2008. 
+
+### How should subsampling be accounted for when calculating total catch of DS in a survey?
+
+The older Access database also had this error, in which only the number of fish measured was used to calculate CPUE. This theoretically should not have been an issue since all DS are to be measured by the 20 mm. However, there are apparently instances of subsampling, and this must be addressed.
+
+### How are surveys with mean fork length > 20 mm early in the season dealt with?
+
+Upon checking the database, the abnormally high mean fork length in survey 1 in 1998 was due to a catch of one 59 mm Delta Smelt; this individual was definitely an adult fish, meaning using a 60 mm threshold to describe YOY vs adult fish across all months is not an ideal solution moving forward.
+
+### Can a tow 3 occur without a tow 2?
+
+These rare instances were due to tow 2 occurring in the field but not entered into the database. Of the three instances, two were because jars between two stations, both tow 2, were accidently mixed, and this was noted in the comments. The last instance did not have any fish caught and no comments were recorded on the datasheet. This instance was simply not entered into the database; as we cannot confidently infer the specific reason(s) as to why this instance was not recorded into the database, this tow should remain not entered and a comment made to reflect this.
+
+# Solutions to these problems
+
+After discussion of these problems, Lauren, Vanessa, and I have agreed on potential remedies going forward.
+
+### Were calibrated k factors used to calculate the indices over the years?
+
+Since the older database showed that the calibrated k factors were used prior to 2015, this transition will simply be hard coded into the calculations (prior to 2015, use the calibrated k factors and after, use the factory k factor). This transition will also be documented in the metadata to be abundantly clear.
+
+### Should the index stations be used to calculate mean fork length of individuals caught in a survey?
+
+The non-index stations will now be included in the CPUE calculations of DS by the 20 mm. It has been 14 years since the addition of these non-indexed stations and sampling have been consistent; there is enough continuity to include them into calculating the Index. This will remove the inconsistency between how the geometric mean of CPUE and mean fork length are calculated: both calculations will now include all 47 stations. This will be reflected in the updated coding and the metadata documentation.
+
+### How are surveys with mean fork length > 20 mm early in the season dealt with?
+
+The Index is should describe only YOY fish. As such, the 60 mm fork length threshold across all months will be replaced with a more dynamic threshold: a YOY Delta Smelt will be defined to be < 50 mm in prior to June and < 60 mm after June. This will be reflected in the updated coding and the metadata documentation. The relevant analysis supporting this new dynamic threshold will also be provided.
+
+### How should subsampling be accounted for when calculating total catch of DS in a survey?
+
+Subsampling of Delta Smelt should not occur for the 20 mm. However, to account for rare instances of subsampling in the future, the code will not use number of fish caught to calculate CPUE instead of number of fish measured. 
+
+### Can a tow 3 occur without a tow 2?
+
+The count of number of tows will continue to be used (no change from the current implementation). This is because some tows although executed in the field, may need to be dropped from the database due to unexpected errors, e.g., jar is lost. These occurrences will be better documented in the comments column of the datasheet going forward; additionally, a QAQC query will also be implemented to identify these instances more quickly.
+
+# Index calculations
+
+All changes described above have been incorporated into a new coding framework, i.e., in an R script instead of across nine Access queries. The primary benefits of these changes are:
+
+1. robustness of the code to changepoints, such as the change in k factor usage in 2015,
+2. a more data supported YOY threshold that is dynamic across the months to account for fish growth,
+3. consistency in output, with all manual steps removed from the calculation pipeline,
+4. and transparency in the Index calculations, as everything is available in a singular R script.
+
+Comparison of the Index values between the two calculation methods show the main difference being an overall increase in the Index after 2008. This is due to the inclusion of the six additional stations near Liberty Island in the CPUE calculation. Despite this addition, the overall status and trends of the population remains the same as the previously calculated Index values (Figure 2). 
+
+```{r comparison, fig.cap="Figure 2. The 20 mm Index per year since the inception of the survey in 1995. The historically provided values is compared to the Index values using the updated calculations detailed in this document."}
+index <- readRDS("20mmIndexCalculations.RDS")
+
+index %>% 
+  pivot_longer(-year, names_to = "era", values_to = "index") %>% 
+  ggplot(aes(x = year, y = index, color = factor(era))) +
+  geom_line(size = 1) +
+  geom_point(size = 4) +
+  scale_color_npg() +
+  labs(x = "Year",
+       y = "Index",
+       color = "Variant") +
+  theme(legend.position = "top")
+```
+
+```{r comparison table}
+index %>% 
+  mutate(indexDifference = index - indexHistorical) %>% 
+  makeKable(caption = "Table 1. The 20 mm Index values as calculated using the new methods compared to the previously provided values. The difference in 2005 and 2006 is due to subsampling instances for those years; the difference from 2008 onwards is due to the inclusion of the six non-index stations.")
+```
+
+```{r meanFL table}
+meanFLTable <- readRDS("20mmFLTable.RDS")
+
+meanFLTable %>% 
+  makeKable(caption = "Table 2. Calculated geometric mean of Delta Smelt CPUE and mean fork lengths across all years and surveys. Surveys with an `NA` geometric mean or fork length were surveys not sampled for that year. Surveys in which not all stations were sampled are included in the average calculations. The four Index Surveys for each year is calculated as the two surveys before and after mean fork length of the population crosses 20 mm.")
+```

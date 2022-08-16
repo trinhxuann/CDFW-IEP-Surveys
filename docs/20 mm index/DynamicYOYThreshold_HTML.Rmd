@@ -1,0 +1,453 @@
+---
+title: "Delta Smelt YOY fork length threshold in the 20mm"
+author: "Nguyen, T. X."
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document
+---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+```{r setup, include=FALSE}
+startTime <- Sys.time()
+# Loading libraries
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggplot2)
+library(ggdark)
+library(lubridate)
+library(ggsci)
+library(caret)
+library(randomForest)
+library(doParallel)
+library(rgdal)
+library(stringr)
+library(ggtext)
+library(kableExtra)
+
+options(scipen = 999, width = 80)
+
+knitr::opts_chunk$set(dpi=320, width = 150, fig.width=16, fig.height=12, warning=FALSE, message=F, dev.args = list(type = "cairo-png", pointsize = 13), echo = T)
+
+makeKable <- function(df, caption = NULL, width = "100%", height = NULL) {
+  
+  table <- kbl(df, caption = caption) %>%
+  kable_classic(full_width = T, html_font = "Cambria", "striped")
+  
+  if (!is.null(height)) {
+    height <- paste0(height, "px")
+    
+    table <- scroll_box(table, width = width, height = height)
+  }
+  table
+}
+
+myTheme <- dark_theme_bw(base_size = 24) +
+  theme(panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "#2c2828", color = NA),
+        panel.background = element_blank(),
+        # panel.grid.major = element_blank(),
+        panel.grid.major = element_line(color = "#646464", size = 0.2),
+        legend.background = element_blank(),
+        legend.key = element_blank())
+
+theme_set(myTheme)
+```
+
+## Purpose
+
+The 20-mm Delta Smelt Index aims to describe young of the year (YOY) Delta Smelt caught in the 20-mm Survey. The survey occassionally catch individuals that are larger than YOY, and those individuals must be removed from the index calculations. Currently, a static 60 mm threshold is used to differentiate between the cohorts across all sampled months. This approach failed to determine what is very likely an adult fish in 1998 that measured 59 mm in Survey 1. The inclusion of this individual fish for 1998 would have pushed the average fork length for the Survey 1 above 20-mm which would have resulted in an Index calculation that did not correctly described the YOY population for that year. As such, a more dynamic fork length threshold may be warranted. 
+
+This document explores the creation of a more dynamic threshold cutoff.
+
+## Method
+
+A scatterplot of lengths per month of all Delta Smelt caught in the 20-mm across all years shows two distinct clusters per month, from March - July. These two clusters can be modeled by using various clustering approaches. Two approaches were tried: 1) using an agglomerative hierarchical clustering algorithm to create a binary classification variable followed by a random forest model to predict the cluster classifications based on month and length; and 2) using a mixture model approach, which assigns probabilities without the need of a secondary model.
+
+## Analysis
+### Reading in the data
+This dataset is the cleaned and joined file of the 20-mm database as of the creation date of this document. All manipulation steps to create this initial file are documented in a singular R script.
+
+```{r read in the dataset}
+data <- read_csv(file.path("..", "..", "data-raw", "20mm", "TMM.csv"), 
+                 col_types = cols(
+                   Source = col_character(),
+                   Station = col_double(),
+                   Latitude = col_double(),
+                   Longitude = col_double(),
+                   Date = col_date(format = ""),
+                   Datetime = col_datetime(format = ""),
+                   Survey = col_double(),
+                   TowNum = col_double(),
+                   Depth = col_double(),
+                   SampleID = col_character(),
+                   Method = col_character(),
+                   Tide = col_character(),
+                   Sal_surf = col_double(),
+                   Temp_surf = col_double(),
+                   Secchi = col_double(),
+                   Tow_volume = col_double(),
+                   Cable_length = col_double(),
+                   Taxa = col_character(),
+                   Length = col_double(),
+                   Count = col_double(),
+                   Length_NA_flag = col_character(),
+                   Notes_survey = col_character(),
+                   Notes_station = col_character(),
+                   Notes_gear = col_character()
+                 ))
+```
+
+### Hiearchical clustering + random forest model
+
+The first approach uses an agglomeration hiearchical clustering algorithm to first define a binary response variable of YOY and non-YOY fish and then a classification tree model to relate month and fork length to the defined classes. Specifically, the `hclust` function from the `stats` package in base R (version 4.1.1; R Core Team) is used to cluster the groupings per month. The distince matrix is calculated as the euclidean distance and the clustering method used is the average linkage. Using domain knowledge, the tree is cut into 2 clusters, YOY and adults. Only months 3-7 are clustered; month 8 was only sampled in years 1995 and 1998 and visual inspection shows there were not any adults caught (this is expected as all adult Delta Smelt should have spawned by August and lost to the population).
+
+```{r find the clusters}
+# Find the clusters
+produceClusters <- function(data, 
+                            taxa = "Hypomesus transpacificus",
+                            distanceMethod = "euclidean",
+                            clusterMethod = "average",
+                            months = 3:7) {
+  
+  dataFiltered <- data %>% 
+    filter(Taxa == taxa) %>%
+    group_by(Month = month(Date)) %>% 
+    mutate(lengthScaled = scale(Length)) %>% 
+    ungroup() %>% 
+    group_split(Month, .keep = T)
+  
+  names(dataFiltered) <- sapply(dataFiltered, function(x) unique(x$Month))
+  
+  distanceMatrix <- lapply(as.character(months), function(x) dist(dataFiltered[[x]]$lengthScaled, method = distanceMethod))
+  hclusters <- lapply(distanceMatrix, hclust, method = clusterMethod) %>% 
+    setNames(as.character(months))
+  
+  finalClusters <- lapply(as.character(months), function(x) {
+    mutate(dataFiltered[[x]], cluster = cutree(hclusters[[x]], 2))
+  }) %>%
+    bind_rows(.id = "ID")
+  
+  finalMonths <- month(data$Date) %>% 
+    unique()
+  
+  missingMonth <- finalMonths[which(!finalMonths %in% months)] %>% 
+    as.character()
+  
+  finalData <- bind_rows(finalClusters,
+                         dataFiltered[[missingMonth]])
+  if (nrow(finalData) %in% nrow(data %>% 
+                                filter(Taxa == taxa))) {
+    cat("The missing month here was", missingMonth, "which will need to be manually classified with your preferred cluster.")
+    finalData
+  } else {
+    stop("Final data frame does not account for all instances of catch for this species.")
+  }
+}
+# Month 8 was not clustered as there is only 1 cluster (YOY)
+# This is specified manually
+dataset <- produceClusters(data) %>% 
+  # Need to fill in the missing month
+  mutate(cluster = ifelse(Month == 8, 1, cluster),
+         cluster = factor(ifelse(cluster == 1, "YOY", "Adults"), 
+                          levels = c("YOY", "Adults")))
+```
+
+```{r quickly visualize the distribution before modeling, fig.cap="Figure 1. Visualization of the two clusters per month as defined by the clustering algorithm. Month 8 was manually specified as YOY from visual inspect of the distribution."}
+set.seed(135)
+dataset %>% 
+  ggplot(aes(Month, Length, color = cluster)) +
+  geom_jitter() +
+  scale_color_npg()
+```
+
+The cluster classifications can now be used as the response variable for a random forest model, the `randomForest` package (version 4.7-1; Liaw and Wiener 2002). A tree-based approach was chosen as it is entirely data driven, making no assumptions about the distributions of the underlying data.
+
+```{r random forest training}
+cl <- makePSOCKcluster(detectCores())
+registerDoParallel(cl)
+
+# Creating list of seeds
+# 10 folds 3 repeats = 30 elements + 1 element for final model
+seeds <- lapply(1:31, function(x) {
+  set.seed(135)
+  if (x != 31) {
+    sample(1:1000000, 2)
+  } else {
+    sample(1:1000000, 1)
+  }
+})
+
+control <- trainControl(method = "repeatedcv",
+                        number = 10,
+                        repeats = 3,
+                        verboseIter = F,
+                        allowParallel = T,
+                        classProbs = T,
+                        seeds = seeds,
+                        savePredictions = "final")
+
+rfModel <- train(cluster ~ Month + Length,
+                 data = dataset,
+                 preProcess = c("center", "scale"),
+                 method = "rf",
+                 metric = "Kappa",
+                 tuneGrid = expand.grid(mtry = seq(1, 2, 1)),
+                 trControl = control)
+
+stopCluster(cl)
+
+resultTable <- rfModel$results %>% 
+    filter(mtry %in% rfModel$bestTune$mtry)
+
+# Check to see optimal tune, although this is silly as there is only 2 features
+ggplot(rfModel)
+# Did the model stabilize at 500 trees
+plot(rfModel$finalModel, main = "Random Forest",
+     lwd = 5, cex.lab = 1.5, cex.axis = 1.5, cex.main = 1.5, cex.sub = 1.5)
+```
+
+The model converged and stabilized at 500 trees. Accuracy and Kappa of the final trained model are very high, at `r round(resultTable$Accuracy, 4) * 100` and `r round(resultTable$Kappa, 4) * 100` respectively. Next, a simulation study can be used to find the modeled length threshold values per month that separates the two classes at a 50% proabbility threshold:
+
+```{r random forest simulation}
+# Simulating to find threshold per month
+simulatedDF <- bind_rows(lapply(3:8, function(x) data.frame(Month = rep(x, 1000),
+                                           Length = seq(min(dataset$Length), 
+                                                        max(dataset$Length), 
+                                                        length = 1000))) %>% 
+                    setNames(3:8), .id = "Month") %>% 
+  mutate(Month = as.numeric(Month)) %>% 
+  mutate(predicted = predict(rfModel, .)) %>% 
+  bind_cols(predict(rfModel, ., type = "prob"))
+
+thresholdDF_50 <- simulatedDF %>% 
+  filter(predicted == "YOY") %>% 
+  group_by(Month) %>% 
+  slice_max((Length)) %>% 
+  rename(LengthCutoff = Length) %>% 
+  bind_rows(data.frame(Month = 9)) %>% 
+  ungroup() %>% 
+  fill(LengthCutoff, predicted) %>% 
+  mutate(LengthCutoff = round(LengthCutoff))
+
+makeKable(thresholdDF_50, caption = "Table 1. Modeled threshold values from the trained random forest model, with the response variable determined by a hiearchical clustering model.")
+```
+
+### Mixture models
+
+A mixture model approach can also be used to explore age class distributions. Due to the obvious separation of age classes from Figure 1, fork lengths per month can be described by discrete distributions. The `mixdist` package (version 0.5-5; Macdonald 2018) was used to build these mixture models. Similar to the hierarchical approach, each month was model separately as fish are growing over time. However, unlike the hierarchical approach, all adult sized fish, > 50 mm in March-May and > 60 mm in June and July, were treated as a singular group and kept consistent throughout the months of March-July. This was due to: 1) the extreme imbalance between YOY and adult fish, 26972 vs 203 individuals across all months, respectively, and 2) the general stability in sizes of adults across these months (Figure 1) seemingly fitting to a singular distribution. 
+
+```{r starting the model}
+library(mixdist)
+
+# First, separate the adults and YOY data frames. The YOY dataframes will be filtered per month to create a mixture model per month; the adult DF will be consistent across all months as reasoned above.
+adults <- dataset %>% 
+  filter((Length > 50 & Month %in% c(3:5))|
+         (Length > 60 & Month %in% c(6:8)))
+YOY <- dataset %>% 
+  filter((Length <= 50 & Month %in% c(3:5))|
+           (Length <= 60 & Month %in% c(6:8)))
+
+# The fitting funciton itself
+fitMix <- function(Month = 3:7, 
+                   Year = NULL,
+                   mu, sigma, pi) {
+ 
+  if (!is.null(Year)) {
+    YOY <- filter(YOY, year(Date) == !!Year)
+    adults <- filter(adults, year(Date) == !!Year)
+  }
+  # Here, YOY is filtered per month but the adults data frame is always used in its entirety
+  datasetMixed <- YOY %>% 
+    filter(Month == !!Month) %>% 
+    bind_rows(adults) %>% 
+    uncount(as.integer(Count)) %>% 
+    group_by(Length) %>% 
+    tally() %>% 
+    ungroup() %>% 
+    arrange(Length) %>% 
+    rename(length = Length,
+           freq = n) %>% 
+    tidyr::complete(length = seq(min(length), max(length), by = 1)) %>% 
+    add_row(length = Inf, freq = 1) %>% 
+    replace_na(list(freq = 0)) %>% 
+    # The mixdist package requires the df to be in length frequency format
+    as.mixdata()
+  
+  fitYOY <- mix(datasetMixed,
+                mixpar = mixparam(mu = mu, 
+                                  sigma = sigma, 
+                                  pi = pi),
+                dist = "norm",
+                mixconstr(consigma = "SEQ"),
+                iterlim = 150)
+  
+  list(datasetMixed = datasetMixed,
+       fitYOY = fitYOY)
+}
+
+fitList <- list()
+# The actual models
+fitList <- mapply(fitMix,
+                  Month = list(3, 4, 5, 6, 7),
+                  mu = list(c(10, 70),
+                            c(10, 70),
+                            c(20, 70),
+                            c(20, 40, 70),
+                            c(25, 40, 70)),
+                  sigma = list(c(5, 5),
+                               c(5, 5),
+                               c(5, 5),
+                               c(5, 5, 5),
+                               c(5, 5, 5)),
+                  pi = list(c(0.8, 0.2),
+                            c(0.95, 0.05),
+                            c(0.99, 0.01),
+                            c(0.7, 0.2, 0.1),
+                            c(0.55, 0.45, 0.05)),
+                  SIMPLIFY = F) %>% 
+  setNames(month.abb[3:7])
+```
+
+Models were fitted for the months from March-July and August was excluded as there are no more adults during that month (Figure 1). After subsequent optimizations, March-May can be described in two distributions but June and July required three. The starting mean (mu), standard deviation (sigma), and starting mixing proportion (pi) values are displayed below in Table 2:
+
+```{r table}
+data.frame(Month = month.abb[3:7],
+           mu = c("10, 70", "10, 70", "20 70", "20, 40, 70", "20, 40, 70"),
+           sigma = c("5, 5", "5, 5", "5, 5", "5, 5, 5", "5, 5, 5"),
+           pi = c("0.8, 0.2", "0.95, 0.5", "0.99, 0.01", "0.7, 0.2, 0.1", "0.55, 0.45, 0.05")) %>% 
+  makeKable(caption = "Table 2. Starting values for mean (mu), standard deviation (sigma), and mixing proportions (pi) per month for model fitting.")
+```
+
+The resulting fits per month:
+
+```{r plot results, as.is = T}
+par(mfrow=c(3,2))
+for (i in month.abb[3:7]) {
+    plot(fitList[[i]]$fitYOY, cex.lab = 1.5, cex.axis = 1.5, cex.sub = 1.5)
+    title(main = i,
+          cex.main=2)
+}
+```
+
+The fitted parameters for these models:
+
+```{r fitted params}
+lapply(month.abb[3:7], function(x) {
+  df <- data.frame(month = x,
+             fitList[[x]]$fitYOY$parameters)
+  
+  if (any(x %in% c("Jun", "Jul"))) {
+    df %>% 
+      mutate(ageClass = c("YOY1", "YOY2", "Adult"))
+  } else {
+    df %>% 
+      mutate(ageClass = c("YOY", "Adult"))
+  }
+}) %>% 
+  bind_rows() %>% 
+  select(month, ageClass, mu, sigma, pi) %>% 
+  makeKable(caption = "Table 3. Fitted parameters of the mixture models across the months of March-July. August was not fitted, as there are only YOY fish at that point of the year.")
+```
+
+## Modeled thresholds
+
+The modeled thresholds can be visualized to determine probable fork length threshold values to describe YOY delta smelt. Both the random forest and mixture model approaches can provide predicted probability of assignments. As such, the thresholds associated with a 50% probability of a YOY assignment for the random forest model (less conservative), a 95% probability of assignment for the mixture model (more conservative), and the visualization of all sampled fork lengths were utilized to inform a chosen threshold: YOY individuals are those $\le$ 50 mm for the months prior to June and $\le$ 60 mm from June onwards.
+
+```{r visualization of final thresholds, fig.cap="Figure 2. Length distributions between YOY and adult fish across the months of March to August. Colored points represents the classification of individuals as YOY or adult based on the chosen cut off, shown as a white solid line. Dashed teal and green lines represent model outputted thresholds at the 50% and 95% probabilities for the random forest and mixture models, respectively. The numerical values of these thresholds are also provided as text under x = 0 in the same colors as their graphical representation."}
+thresholdDF <- data.frame(Month = 3:8,
+                          LengthCutoff = c(50, 50, 50, 60, 60, 60))
+
+# Finding the transition points per class per month:
+lengthCutOffMixture <- sapply(month.abb[3:7], function(x) {
+  df <- bind_cols(fitList[[x]]$datasetMixed, fitted.mix(fitList[[x]]$fitYOY)$conditprob)
+  
+  # As it stands, the last column will be always be the adults
+  adultColumnPosition <- ncol(df)
+  df %>% 
+    mutate(adultProbability = !!sym(names(df)[adultColumnPosition])) %>% 
+    filter(adultProbability > 0.95) %>% 
+    slice(1) %>% 
+    pull(length)
+})
+
+# Plotting it
+set.seed(135)
+dataset %>% 
+  left_join(thresholdDF, by = "Month") %>% 
+  mutate(predictions = factor(ifelse(Length <= LengthCutoff, "YOY", "Adults"),
+                              levels = c("YOY", "Adults"))) %>% 
+  ggplot(aes(Month, Length)) +
+  geom_step(data = thresholdDF %>% 
+              add_row(Month = 9,
+                      LengthCutoff = 60),
+            aes(x = Month - 0.5, 
+                y = LengthCutoff,
+                color = "chosenCutoff"), 
+            size = 1.1) +
+  geom_step(data = thresholdDF_50 %>% 
+              rename(randomForest50 = LengthCutoff) %>% 
+              mutate(mixture95 = c(lengthCutOffMixture, 64, 64)) %>% 
+              pivot_longer(c(randomForest50, mixture95),
+                           names_to = "model",
+                           values_to = "lengthCutoff"),
+            aes(x = Month - 0.5, y = lengthCutoff, color = model), 
+            size = 1.1, 
+            linetype = 4) +
+  geom_jitter(aes(color = predictions)) +
+  geom_richtext(data = thresholdDF,
+                aes(y = -2,
+                    label = paste0("<span style='color:white'>",
+                                   round(LengthCutoff, 1), 
+                                   ", </span>",
+                                   "<span style='color:#00A087FF'>", 
+                                   round(thresholdDF_50$LengthCutoff[-7]), 
+                                   ", </span>",
+                                   "<span style='color:#4DBBD5FF'>", 
+                                   round(c(lengthCutOffMixture, 64)),
+                                   "</span>",
+                                   "<span style='color:white'>",
+                                   " mm </span>", 
+                                   sep = " ")),
+                size = 5,
+                fill = NA,
+                label.color = NA,
+                label.padding = grid::unit(rep(0, 4), "pt")) +
+  scale_color_manual(values = c("#E64B35FF", "#3C5488FF", "white", "#00A087FF", "#4DBBD5FF"),
+                     breaks = c("Adults", "YOY", "chosenCutoff", "randomForest50", "mixture95")) +
+  scale_x_continuous(breaks = 3:8, labels = month.abb[3:8]) +
+  guides(color = guide_legend(override.aes = list(linetype = c(0, 0, 1, 4, 4),
+                                                  shape = c(16, 16, NA, NA, NA)))) +
+  labs(color = "")
+```
+
+In table format, the thresholds are:
+
+```{r chosen cutoffs table}
+thresholdDF %>% 
+    mutate(randomForest50 = round(thresholdDF_50$LengthCutoff[-7]),
+           mixture95 = round(c(lengthCutOffMixture, NA))) %>% 
+    fill(mixture95) %>% 
+    rename(chosenCutoff = LengthCutoff) %>% 
+  makeKable(caption = "Table 4. Length threshold cutoffs classifying young of the year (YOY) vs adult Delta Smelt. The thresholds informed by the random forest and mixture models were taken at 50% and 95% probabilities, respectively.")
+```
+
+## Literature Cited
+<div style="text-indent: -40px; padding-left: 40px;">
+
+A. Liaw and M. Wiener (2002). Classification and Regression by randomForest. R News 2(3), 18--22.
+
+Peter Macdonald and with contributions from Juan Du (2018). mixdist: Finite Mixture Distribution Models. R package version 0.5-5. https://CRAN.R-project.org/package=mixdist
+
+R Core Team (2021). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+</div>
+
+<br>
+
+[Total time elapsed to create document: `r round(as.numeric(Sys.time() - startTime, units = "mins"), 2)` minutes.]{style="float:right"}
