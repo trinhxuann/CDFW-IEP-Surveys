@@ -163,9 +163,6 @@ geo.dist = function(df) {
 findOutlierGPS <- function(df, station = NULL, Year = NULL, 
                            k = NULL, plot = T) {
   
-  ###### TO WORK ON: Do I need to make the row index for the dendogram more readable? Right now, the
-  # indices are rearranged. Perhaps just use the dates instead???
-  
   if (!is.null(station)) df <- filter(df, Station %in% station)
   
   # need the TheoreticalCoords filter because those do not have a year associated with them; ok to do it here
@@ -236,23 +233,15 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
 # print = F used AFTER confirming with the visualizations that this is what you want
 
 GPSOutlying <- list()
-GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 418, Year = 2022, k = 2)
-GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 801, Year = 2022, k = 2)
-GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 716, Year = 2022, k = 2)
-GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
-GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 906, Year = 2022, k = 2)
-GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
-GPSOutlying[[7]] <- findOutlierGPS(GPSDF, station = 915, Year = 2022, k = 2)
-# 914 for 2022 seems as though ALL tows are slightly off from the theoretical
-GPSOutlying[[8]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2)
+# GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022)
+GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022, k = 3)
+GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
+GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
+GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2, plot = F)
 
 # Might be useful to plot all years data for the particular station of interest?
 
-findOutlierGPS(GPSDF %>% 
-                 filter(!is.na(Lat) & !is.na(Long)), 
-               station = 914)
-# 914 has ALWAYS been towed at a different location than the theoretical...?
-
+# findOutlierGPS(GPSDF, station = 610)
 # findOutlierGPS(GPSDF, station = 610, k = 4)
 # 
 # GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2, plot = F)

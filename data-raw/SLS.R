@@ -165,7 +165,15 @@ readSLSAccess <- function(file = Args[2],
     # The catch table is fine, just needs the manipulation to Date
     mutate(Date = as.Date(Date))
   
-  # Length table
+  # Fish code table
+  fishCodePosition <- which(sapply(SLSTables, 
+                                  function(tables) any(grepl("Common.Name", 
+                                                             x = names(tables), 
+                                                             ignore.case = T))))
+  SLSTables[[fishCodePosition]] <- SLSTables[[fishCodePosition]] %>% 
+    select('Common.Name','Fish.Code')
+ 
+   # Length table
   lengthPosition <- which(sapply(SLSTables, 
                                  function(tables) any(grepl("Length", 
                                                             x = names(tables), 
