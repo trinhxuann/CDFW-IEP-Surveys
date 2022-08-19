@@ -1,0 +1,22 @@
+waterYear,Note
+2009,Project start. Five biweekly Delta-wide (35 stations) surveys conducted from early January to early March
+2010,Temporal extension of sampling temporarily for this season; six biweekly (35 stations) surveys conducted from early January to late March (this addition lasted only this season)
+2010,Implementation of using a Hach Model 2100P Turbidimeter as Standard Operating Procedure to record turbidity in NTU's
+2010,"Recorded sampling latitude and longitude on datasheets, but this data was not entered into the database."
+2011,Latitude and longitude of tows recorded into database
+2011,Yolk sac and oil globule presence noted in the data
+2012,Sixth survey permanently added
+2013,
+2014,"Spatial extension of sampling into the Napa River as part of an agreement with the State Water Contractors (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349)"
+2014,"Database was revised by Tuongvan Nguyen at ITB as part of the Bay Delta Application Hosting to move public facing data onto a secured Tier 3 server. Data is now entered into 'SLS_Local.mdb' (local server), and appended to the Tier 3 server before uploading to the public webpage"
+2014,"New nets were incorporated (manufactured on 5/10/2013 by Lodi Tent and Awning) with a different Nitex Mesh purchased from Sefar (500 micron, 47% open space, part #06-500/47)"
+2015,Factory k value (0.026873027) used in the `MeterCorrections` table. Flowmeters were not calibrated at UC Davis due to machinery malfunction. The facility is awaiting repairs.
+2016,Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season.
+2017,Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season.
+2018,Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for reburbishing prior to field season
+2019,Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season or replaced with new meters if readings are inaccurate (assessed at the end of a season)
+2019,"Spatial reduction of sampling. Ceased sampling stations within the Napa River (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349)"
+2019,"On 2019-09-10, two tables were removed from the local copy of the database: `Zooplankton` and `Zoo Catch`. These tables were appended to the database from the 20–mm database back in 2013. The SLS survey does not survey for zooplankton. More information and a copy of the tables can be found on the local server: U:/NativeFish/SmeltData/Zooplankton/SLS_Erroneous_ZooTables.xlsx"
+2020,Surveys 2 and 3 only sampled the high priority stations in the south and central Delta due to concerns related to the COVID-19 pandemic.
+2021,"Spatially constrained, temporal extension of sampling: two additional surveys were added in December and were limited in geographic range to the south/central Delta to inform risk of entrainment for larval Longfin Smelt."
+2022,"The two additional surveys in December are expanded to encompass all stations. Napa River stations (340, 342, 343, 344, 345, 346, 347, 348, and 349) have been added back to the surveys, including the supplemental December surveys."
