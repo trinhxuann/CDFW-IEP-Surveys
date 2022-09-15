@@ -12,6 +12,7 @@ library(dplyr, warn.conflicts = F)
 library(tidyr)
 library(DBI)
 library(odbc)
+library(stringr)
 
 # This will evaluate arguments accompanied with the terminal command to use in this specific script
 if (!exists("Args")) {
@@ -19,57 +20,10 @@ if (!exists("Args")) {
 } 
 
 # Currently, commandArgs is set up so that:
-# first argument is the bypass arg; 
-# second argument is the file arg;
+# first argument is the file arg; 
 # the rest will be the names of the table that you want. There isn't leeway for edge cases yet
 
-# Function to download the 20mm database. Change the ftp website url as required
-download20mm <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Smelt",
-                        surveyName = "20mm_New",
-                        extension = ".zip",
-                        bypass = Args[1]) {
-  
-  if (is.na(bypass)) bypass <- F
-  
-  if (bypass) {
-    return(cat("Bypass was specified, not downloading from the FTP site. \n"))
-  }
-  
-  # # Does this file already exists? If so, do not download again. Useful for running
-  # # this command multiple times during a session. This is because the FTP server
-  # # will limit connections to it if it is made too often
-  if (file.exists(file.path(tempdir(), paste0(surveyName, ".zip")))) {
-    return(cat("FTP database has already been created. Not downloading again."))
-  }
-  
-  library(rvest)
-  # Fetch the 20mm name from the ftp website
-  # Create websession
-  startingSession <- xml2::read_html(x = url)
-  # Find all the relevant nodes
-  nodes <- rvest::html_nodes(startingSession, "a")
-  # Pull all text of all links on webpage
-  links <- rvest::html_attr(nodes, "href")
-  # Subset only the relevant link for the survey of interest
-  surveyLink <- stringr::str_subset(links, paste0(surveyName, "*.+", extension))
-  surveyName <- surveyName
-  fileName <- sub(".*/", "", surveyLink)
-  # Doing it this way to hopefully it make more robust to weird changes in the future
-  # for eg, 20mm is not just 20mm.zip, but 20mm_New.zip
-  
-  # Download the 20mm.zip file from the ftp website
-  # Download to tempfolder
-  tempFile <- file.path(tempdir(), fileName)
-  # Sets up the URL path here
-  dbLink <- paste0(url, "/", fileName)
-  
-  # Download the zipped database
-  # As it is zipped, will set mode = "wb"
-  download.file(dbLink, destfile = tempFile,
-                mode = "wb")
-}
-
-connectAccess <- function(file = Args[2],
+connectAccess <- function(file = Args[1],
                           exdir = tempdir(),
                           surveyName = "20mm") {
   
@@ -111,7 +65,7 @@ connectAccess <- function(file = Args[2],
 # Function to start reading data from Access directly
 read20mmAccess <- function(surveyName = "20mm",
                            returnDF = F,
-                          tablesReturned = Args[-(1:2)]) {
+                          tablesReturned = Args[-(1)]) {
   pb <- txtProgressBar(min = 0, max = 5, style = 3)
   startTime <- Sys.time()
   cat("\nConnecting to Access \n")
@@ -333,7 +287,6 @@ read20mmAccess <- function(surveyName = "20mm",
 }
 
 # # Run the functions to download and read the database
-download20mm()
 read20mmAccess()
 
 # # This part of the code is for when you want to run this script directly, which you should not need to

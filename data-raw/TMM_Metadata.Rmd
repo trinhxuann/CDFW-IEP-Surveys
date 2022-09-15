@@ -1,12 +1,16 @@
 ---
-title: "Interagency Ecological Program San Francisco Estuary 20 mm Survey (20 mm) (FISH) Metadata"
+title: Interagency Ecological Program San Francisco Estuary 20 mm Survey (20 mm) \textbf{(FISH)}
+  Metadata
 output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
   html_document:
-    toc: true
+    toc: yes
     toc_float:
-      toc_collapsed: true
+      toc_collapsed: yes
     toc_depth: 2
-    number_sections: false
+    number_sections: no
     theme: lumen
 ---
 
@@ -17,6 +21,8 @@ output:
 }
 </style>
 
+\definecolor{link}{HTML}{0853BF}
+
 ```{r setup, include=FALSE}
 # Loading libraries
 
@@ -25,10 +31,12 @@ library(dplyr)
 library(ggplot2)
 library(leaflet)
 library(tidyr)
+library(mapview)
+library(readxl)
 
 options(scipen = 999, width = 80)
 
-knitr::opts_chunk$set(dpi=320, width = 150, fig.width=18, fig.height=14, warning=FALSE, message=F, dev.args = list(type = "cairo-png", pointsize = 13), echo = F)
+knitr::opts_chunk$set(dpi=320, width = 150, fig.width=18, fig.height=10, warning=FALSE, message=F, dev = "cairo_pdf", dev.args = list(pointsize = 13), echo = F)
 
 makeKable <- function(df, caption = NULL, width = "100%", height = NULL) {
   
@@ -44,7 +52,8 @@ makeKable <- function(df, caption = NULL, width = "100%", height = NULL) {
 }
 
 # Joined SLS dataset
-TMM <- read.csv(file.path("20mm", "TMM.csv"))
+TMM <- read.csv(file.path("20mm", "TMM.csv")) %>% 
+  mutate(Date = as.Date(Date))
 ```
 
 ## Study Management
@@ -66,14 +75,14 @@ Phone: (209) 234-3420 Fax: (209) 234-3689
 
 ## Study Overview
 
-**Purpose/Objective:** The 20-mm Survey monitors postlarval-juvenile Delta Smelt distribution and relative abundance throughout their historical spring range in the Sacramento-San Joaquin Delta and San Francisco Estuary. The data is also used to help estimate larval and juvenile Delta Smelt and Longfin Smelt entrainment at the State Water Project (SWP) and Central Valley Project (CVP). This page pertains only the fish data of the 20 mm survey.
+**Purpose/Objective:** The 20mm Survey monitors post-larval **(Should this say larval...? which is it post-larval or larval)** and juvenile Delta Smelt distribution and relative abundance throughout their historical spring range in the Sacramento-San Joaquin Delta and San Francisco Estuary (Bay-Delta Estuary). The data is also used to help estimate larval and juvenile Delta Smelt and Longfin Smelt entrainment at the State Water Project (SWP) and Central Valley Project (CVP). This document contains metadata for **only the fish data** of the 20 mm survey.
 
 
-**Data collected:** Surface water temperature (°C), surface and bottom electro-conductivity (EC, μS/cm, normalized at 25 °C), Secchi depth (cm), water volume (m$^3$), tidal stage, and identification, counts, and lengths (mm, fork lengths or total length for species without a forked tail) of fishes to the lowest possible taxon.
+**Data collected:** Surface water temperature (°C), surface and bottom electro-conductivity (EC, $\mu$S/cm, normalized at 25 °C), Secchi depth (cm), water volume (m$^3$), tidal stage, and identification, counts, and lengths (mm, fork lengths or total length for species without a forked tail) of fishes to the lowest possible taxon.
 
-**Geographic range of work:** The 20-mm Survey currently samples 47 stations every other week from March to July.  There is 1 station in east San Pablo Bay, 6 in the Napa River, 16 in Suisun Bay/Confluence region, 12 in the Sacramento River/Cache Slough/Deep Water Ship Channel region, and 12 in the South and Central Delta. During high outflow years, 5 additional stations are sampled in San Pablo Bay to provide greater spatial coverage of potential Delta Smelt habitat.
+**Geographic range of work:** The 20mm Survey currently samples 47 stations every other week from March to July.  These stations are distributed 1 station in east San Pablo Bay, 6 in the Napa River, 16 in Suisun Bay/Confluence region, 12 in the Sacramento River/Cache Slough/Deep Water Ship Channel region, and 12 in the South and Central Delta. During high outflow years, 5 additional stations are sampled in San Pablo Bay to provide greater spatial coverage of potential Delta Smelt habitat.
 
-```{r, overall map, echo = F, results='asis', fig.cap="Figure 1. Map displaying the geographic range of work. Each point represents the location of a sampling station. Stations in the southern and central Delta (809-919) and at Barker Slough (716) have monitoring requirements tied to the 2020 SWP Incidental Take Permit (ITP) and are uniquely colored."}
+```{r, overall map, echo = F, results='asis'}
 # This file is simply the 47 stations in the StationCords.csv file + the 5 high outflow stations
 # I've added the status column myself for plotting below
 
@@ -84,53 +93,83 @@ mapDF <- read.csv(file.path("..", "docs", "StationCords_20mmTN.csv")) %>%
            Latitude = (LatD + LatM/60 + LatS/3600),
            Longitude = -(LonD + LonM/60 + LonS/3600),
            Status = factor(Status,
-                           levels = c("20mmStation", "Non-Index", "HighOutflow")))
+                           levels = c("indexStation", "indexStationNew", "highOutflow")),
+           offsetX = case_when(Station %in% 334 ~ 10,
+                               Station %in% c(335) ~ 0,
+                               Station %in% 329 ~ -2,
+                               Station %in% 336 ~ -5,
+                                  Station %in% 328 ~ c(0),
+                                  Station %in% 723 ~ c(-18),
+                                  TRUE ~ c(18)),
+           offsetY = case_when(Station %in% c(334, 335, 336) ~ c(15),
+                               Station %in% 329 ~ 13,
+                                  Station %in% 328 ~ c(-15),
+                                  Station %in% 723 ~ c(0),
+                                  TRUE ~ c(0)))
 
 # To color the stations on the map accordingly
-# pal <- colorFactor(c("#e41a1c", "#3D8B3A", "#984ea3"), domain = c(specialStations$Status, "SLS Stations"))
-pal <- colorFactor(c("#3B4992FF", "#EE0000FF", "#008B45FF"), 
+# A bit strange how the order of the colors do not seem to follow the levels of the domain?
+pal <- colorFactor(c("#EE0000FF", # highOutflow
+                     "#3B4992FF", # indexStation
+                     "#008B45FF"), # indexStationNew
                    domain = levels(mapDF$Status))
 
-leaflet(mapDF,
-        width = "100%",
-        height = "500") %>%
-    addProviderTiles(providers$Esri.OceanBasemap) %>%
-    addCircleMarkers(~Longitude, ~Latitude,
-                     label = ~as.character(Station),
+m <- leaflet(mapDF) %>%
+    addProviderTiles(providers$Esri.OceanBasemap) 
+
+stationList <- mapDF %>% 
+    split(., .$Station)
+
+names(stationList) %>%
+  purrr::walk(function(mapDF) {
+    m <<- m %>%
+      addCircleMarkers(data = stationList[[mapDF]],
+                       lng=~Longitude, lat=~Latitude,
+                       label = ~as.character(Station),
                      color = ~pal(Status),
                      radius = 6,
                      stroke = F, fillOpacity = 0.8,
                      labelOptions = labelOptions(noHide = T,
-                                                 offset = c(18,0),
+                                                 offset = ~c(offsetX, offsetY),
+                                                 direction = "center",
                                                  textOnly = T,
-                                                 textsize = "12px",
-                                                 direction = "center")) %>% 
-  addLegend(pal = pal, values = ~Status, opacity = 1)
+                                                 textsize = "12px"))
+  })
+
+m %>%
+  addLegend(pal = pal, values = ~Status, opacity = 1) %>% 
+  setView(lat = 38.09690863981991, lng = -121.89539973367937, zoom = 10) %>%
+  # fitBounds(lat1 = 37.88407279406805, lng1 = -122.43901959010311,
+  #             lat2 = 38.2891852849442, lng2 = -121.38259035764148) %>%
+  mapshot(file = "20mmMap.png", cliprect = "viewport",
+          vwidth = 850, vheight = 500)
 ```
 
-**Number of sites:** `r length(unique(filter(mapDF, Status != "HighOutflow")$Station))` stations that are sampled yearl. During high outflow years, `r length(unique(filter(mapDF, Status == "HighOutflow")$Station))` additional stations are sampled. See the [metadata section](#metadata) for additional details of each station.
+![The geographic range of work of the 20mm Survey. Each point represents the location of a sampling station, totalling to 52 stations of primary interest. Stations are colored according to their relationship to the 20mm Index calculation, where blue represents stations that have been included since the advent of the calculation, green since 2022, and red represents high outflow stations that are not included.](20mmMap.png){width=600px}
 
-**Data range:** `r min(TMM$Date)` to `r max(TMM$Date)` (YYYY-mm-dd) <br>
+**Number of sites:** `r length(unique(filter(mapDF, Status != "highOutflow")$Station))` stations that are sampled yearly. During high outflow years, `r length(unique(filter(mapDF, Status == "highOutflow")$Station))` additional stations are sampled. See the [$\color{link}{\text{metadata section}}$](#metadata) for additional details of each station.
 
-**Sampling frequency**: Sampling begins in March/April and is conducted *every other week*. Sampling ends in July/Agust. Standard sampling surveys are numbered 0-9, while supplemental sampling surveys are identified as 10+. 
+**Data range:** `r min(TMM$Date)` to `r max(TMM$Date)` (YYYY-mm-dd)
+
+**Sampling frequency**: Sampling begins in March/April and is conducted *every other week*. Sampling ends in July or Agust **(What are these specific ending conditions?)**. Standard sampling surveys are numbered 0-9, while supplemental sampling surveys are identified as $\ge$ 10.
 
 ## Field Sampling Methods
 
-**Net:** The 20mm Survey samples for both fish and zooplankton across multiple tows per site. A 20-mm net targets larval and juvenile fish and is a conical plankton net that is 5.5 meters (m) in length, has a mouth area of 1.51 m$^2$, and features a 1600 μm (1/16 in.) knotless nylon Delta mesh (35 lb. test). Fish are collected into a removable 2.2 L screened (474 μm stainless steel wire bolting cloth) cod-end jar attached to the deepest part of the net. Zooplankton are sampled concurrently with the fish net using a Clarke-Bumpus (CB) net attached to the top of the 20-mm net frame. The CB net is 78 cm in length, has a mouth area of 0.010101 m$^2$, and features a 160 μm knotless nylon mesh. Similar to fish, zooplankton are collected into a removal **XXXX** L screened cod-end jar attached to the deepest part of the CB net. General Oceananics flowmeters are mounted in the mouth of the 20-mm and CB nets to estimate the volume (m$^3$) of water sampled by each net. After each tow, the entire sample is transferred into a labeled holding jar containing 10% formalin neutralized with sodium borate. Rose Bengal dye is added to each jar to aid in separating animals from detritus for identification under a microscope in the laboratory.
+**Net:** The 20mm Survey samples for both fish and zooplankton across multiple tows per site. A 20-mm net targets larval and juvenile fish and is a conical plankton net that is 5.5 meters (m) in length, has a mouth area of 1.51 m$^2$, and features a 1600 $\mu$m (1/16 in.) knotless nylon Delta mesh (35 lb. test). Fish are collected into a removable 2.2 L screened (474 $\mu$m stainless steel wire bolting cloth) cod-end jar attached to the deepest part of the net. Zooplankton are sampled concurrently with the fish net using a Clarke-Bumpus (CB) net attached to the top of the 20-mm net frame. The CB net is 78 cm in length, has a mouth area of 0.010101 m$^2$, and features a 160 $\mu$m knotless nylon mesh. Similar to fish, zooplankton are collected into a removal **XXXX** L screened cod-end jar attached to the deepest part of the CB net. **(I could remove this information about the CB since this is fish only metadata?)** General Oceananics flowmeters are mounted in the mouth of the 20-mm and CB nets to estimate the volume (m$^3$) of water sampled by each net. After each tow, the entire sample is transferred into a labeled holding jar containing 10% formalin neutralized with sodium borate. Rose Bengal dye is added to each jar to aid in separating animals from detritus for identification under a microscope in the laboratory.
 
-*NEEDED?*: The mesh size was altered prior to the 2014 season to 500 μm NitexR, when the original mesh size was no longer available and new nets were purchased (see 2014 changes below). These new nets were incorporated as old nets became unusable. The net is mounted on a fixed metal tube frame with skids and is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar attached to the deepest part of the net.
+**NEEDED? Was this the same for the 20 mm like the SLS?**: The mesh size was altered prior to the 2014 season to 500 $\mu$m NitexR, when the original mesh size was no longer available and new nets were purchased (see 2014 changes below). These new nets were incorporated as old nets became unusable. The net is mounted on a fixed metal tube frame with skids and is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar attached to the deepest part of the net.
 
-**Tow:** Up to three replicate 10 minute stepped oblique tow with the boat moving at 1 m/s, to keep the CB net completely submerged during the tow, is conducted at each sampling stations. Specifically, fish are sampled across all three tows, while zooplankton are typically sampled once concurrently in the first tow. The amount of cable released is dependent on the water depth at the station. A gradual oblique tow is achieved following the tow schedule specific to the amount of cable released and the duration of the tow. Although most tows are 10 minutes in length, tow time can be reduced during periods of heavy samples. If the net is clogged during algal blooms, jellyfish blooms, or heavy debris events and the cod end jar is overfilling with materials, the tow time can be reduced to 5 or 2.5 minutes and follow an alternate tow schedule and recording the duration on the datasheet. If material is still overflowing from the cod-end jar in a 2.5 minute tow, the tow or entire station is dropped. Re-tows can occur if a sample is compromised, the flow meter reading of the fish net is less than 10000 or greater than 30000 in a 10 minute tow, or the flow meter reading of the CB net is less than 5000 or greater than 25000 in a 10 minute tow. All abnormal events are to be recorded in the "comments" section of the datasheet.
+**Tow:** Up to three replicate 10 minute stepped oblique tow with the boat moving at 1 m/s **(AGAINST THE CURRENT?)** to keep the CB net completely submerged is conducted at each sampling location. Specifically, fish are sampled across all tows, while zooplankton are typically sampled only once during the first tow. The amount of cable released is dependent on the water depth at the sampling location. A gradual oblique tow is achieved following the tow schedule specific to the amount of cable released and the duration of the tow. Although most tows are 10 minutes in length, tow time can be reduced during periods of heavy samples. If the net is clogged during algal blooms, jellyfish blooms, or heavy debris events and the cod end jar is overfilling with materials, the tow time can be reduced to 5 or 2.5 minutes and follow an alternate tow schedule and recording the duration on the datasheet. If materials are still overflowing from the cod-end jar in a 2.5 minute tow, the tow or entire station is dropped. Re-tows do occur if a sample is compromised, the flow meter of the fish net reads less than 10000 or greater than 30000 in a 10 minute tow, or the flow meter of the CB net reads less than 5000 or greater than 25000 in a 10 minute tow. All abnormal events are to be recorded in the "comments" section of the datasheet.
 
-**Flowmeter calibration:** General Oceananics flowmeters are used to estimate the volume of water sampled by each net. This calculation relies on a calibration factor specific to the flowmeter model that equates the rotor constant with the number of counts. Prior to 2015, the calibration factor each every flow meter was calibrated at UC Davis before the start of the season. After 2015, the calibration flume at UC Davis became inoperable, and the meters were sent to General Oceanics for refurbishing before each field season to justify using the factory calibration factor. Since 2019, meters are inspected at the end of every field season and are replaced with new units if refurbshing is required to continue using of the factory calibration factor.
+**Flowmeter calibration:** General Oceananics flowmeters are used to estimate the volume of water sampled by each net. This calculation relies on a calibration factor specific to the flowmeter model that equates the rotor constant with the number of counts. Prior to 2015, the calibration factor each every flow meter was calibrated at UC Davis before the start of the season. Beginning in 2015, the calibration flume at UC Davis became inoperable, and the meters were sent to General Oceanics for refurbishing before each field season to justify using the factory calibration factor. Since 2019, meters are inspected at the end of every field season and are replaced with new units if refurbshing is required--this ensures that the factory calibration factor can continue to be used to estimate tow volume.
 
-**Environmental and water quality data:** Immediately prior to each tow, bottom and surface water samples are indepedently collected. The bottom water sample is taken using a Van Dorn into a bucket, while the surface water sample is taken directly using a separate bucket. From these water samples: 1) surface water temperature (°C) and surface and bottom EC (μS/cm, normalized at 25 °C) are recorded using a calibrated (before each season) and rinsed YSI Model 30; and 2) surface turbidity (NTU) is recorded using a calibrated (before each season) HACH 2100p turbidity meter (sample vials are cleaned with a Kimwipe before each sample). Secchi depth (m) is measured using Secchi discs mounted to rigid meter sticks to a maximum depth of two meters; values are measured in the shade without sunglasses on, off the side of the boat by the same person for the day for consistency. Water bottom depth (ft) is recorded using a depth finder on the boat. Tide data is recorded as the visually observed tidal stage by the crew during the tow as high slack, ebb, low slack, or flood.
+**Environmental and water quality data:** Immediately prior to each tow, bottom and surface water samples are indepedently collected. The bottom water sample is taken using a Van Dorn into a bucket, while the surface water sample is taken directly using a separate bucket. From these water samples: 1) surface water temperature (°C) and surface and bottom EC ($\mu$S/cm, normalized at 25 °C) are recorded using a calibrated (before each season) and rinsed YSI Model 30; and 2) surface turbidity (NTU) is recorded using a calibrated (before each season) HACH 2100p turbidity meter (sample vials are cleaned with a Kimwipe before each sample). Secchi depth (m) is measured using Secchi discs mounted to rigid meter sticks to a maximum depth of two meters; values are measured by the same person off the side of the boat in the shade without sunglasses on for the entire day to maximize consistency. Water bottom depth (ft) is recorded using a depth finder on the boat. Tide data is recorded as the visually observed tidal stage by the crew during the tow as high slack, ebb, low slack, or flood.
 
-**Catch data:** At the end of every tow, the net is washed down so that all visible vegetation, fish, sand, and debris are washed into the cod-end jar. Large debris and fish (≥ 50 mm) can be removed if positively identified. If salmonids were caught, fork lengths are measured, presence of the adipose fin noted, and the fish are immediately released gently and alive. All other larval and juvenile fish are kept in distinctively labeled sampling jars and preserved in 10% buffered (sodium borate) and dyed (rose bengal) formalin for later processing in the laboratory. 
+**Catch data:** At the end of every tow, the net is washed down so that all visible vegetation, fish, sand, and debris are collected into the cod-end jar. Large debris and fish ($\ge$ 50 mm) can be removed if positively identified. When salmonids are caught, fork lengths are measured, presence of the adipose fin noted, and the fish are immediately released gently and alive. All other larval and juvenile fish are kept in distinctively labeled sampling jars and preserved in 10% buffered (sodium borate) and dyed (rose bengal) formalin for later processing in the laboratory.
 
 ## Lab analysis, fish ID and QC
 
-In the lab, before the next survey if possible, fish are identified from each sample under a microscope. First, fish are separated from debris and other organisms during a process referred to as "sorting". Then, the entire sample undergo a quality control (QC) check to ensure that fish were not missed during sorting. Finally, fish undergo a first ID and count by an identifier, followed by a QC from a larval fish ID specialist to confirm all species identifications and counts. This QC process is dependent on the experience of the identifier doing the first ID. Fish identifiers will begin with all their identifications QC'ed and transition to having fewer and fewer samples QC’ed with experience, until the identifier is considered a larval fish ID specialist. Samples are randomly selected to undergo this QC process. Across all samples (QC required or not), all CESA and ESA fishes and any questionable fish IDs must undergo a second ID. All fish are identified to species or the lowest possible taxon. Since the inception of the survey, there have not been instances when of a species has been identified to a lower taxon or identified under a different name. Only the first 50 randomly selected individuals of each species from each tow are measured for lengths to the nearest millimeter, and the rest of the sample is simply enumerated. However, all Longfin Smelt and Delta Smelt are measured for lengths regardless of catch size. 
+In the lab, before the next survey if possible, fish are identified from each sample under a microscope by trained lab staff. First, fish are separated from debris and other organisms during a process named "sorting". Then, the entire sample undergo a quality control (QC) check to ensure that fish were not missed during sorting. Finally, fish undergo ID and count by an identifier, which can be followed by a QC from a larval fish ID specialist to confirm all species identifications and counts. This ID QC process is dependent on the experience of the identifier doing the first ID. Fish identifiers will begin with all their identifications QC'ed and transition to having fewer and fewer samples QC’ed with experience, until the identifier is considered themselves a larval fish ID specialist. Samples are randomly selected to undergo this QC process. Across all samples (QC required or not), all CESA and ESA fishes and any questionable fish IDs must undergo a second ID. All fish are identified to species or the lowest possible taxon. Since the inception of the survey, *there have not been instances* **(IS THIS STILL CORRECT FOR THE 20 MM?** when of a species has been identified to a lower taxon or identified under a different name. Only the first 50 randomly selected individuals of each species from each tow are measured for lengths to the nearest millimeter, and the rest of the sample is simply enumerated. However, all Longfin Smelt and Delta Smelt are measured for lengths regardless of catch size **WILL THIS STILL BE TRUE? I remember there was talk about perhaps not doing this for LFS as you can catch thousands at some stations**.
 
 ## Calculating catch per unit effort (CPUE)
 
@@ -138,9 +177,11 @@ In the lab, before the next survey if possible, fish are identified from each sa
 
 The total number of fish per volume water sampled (standardized to 10000 $m^3$) across all replicate tows is calculated using the following equations:
 
-<center>
-$V_{t} = A * K * D_{t}$
-</center>
+$$
+\begin{aligned}
+V_{t} = A * K * D_{t}
+\end{aligned}
+$$
 
 *Where:*
 
@@ -152,9 +193,11 @@ $K$ = calibration factor of the flow meter, 0.026873027 since 2015
 
 $D_{t}$ = difference in flow meter counts from start to finish of tow $t$
 
-<center>
-$n_{t} = F_{t}/V_{t} * 10000 m^{3}$
-</center>
+$$
+\begin{aligned}
+n_{t} = F_{t}/V_{t} * 10000 m^{3}
+\end{aligned}
+$$
 
 *Where:*
 
@@ -164,9 +207,11 @@ $F_{t}$ = fish caught per tow $t$
 
 $V_{t}$ = volume of water filtered through the net $m^{3}$ per tow $t$
 
-<center>
-$N_{t} = \frac{\sum n_t}{r_t}$
-</center>
+$$
+\begin{aligned}
+N_{t} = \frac{\sum n_t}{r_t}
+\end{aligned}
+$$
 
 *Where:*
 
@@ -180,9 +225,11 @@ $V_{t}$ = volume of water filtered through the net $m^{3}$ per tow $t$
 
 From 2004-current, the number of each zooplankton taxon per cubic meter sampled by the Clark-Bumpus net is calculated using the following equations:
 
-<center>
-$V_{t} = A * K * D_{t}$
-</center>
+$$
+\begin{aligned}
+V_{t} = A * K * D_{t}
+\end{aligned}
+$$
 
 *Where:*
 
@@ -194,9 +241,11 @@ $K$ = calibration factor of the flow meter, 0.026873027 since 2015
 
 $D_{t}$ = difference in flow meter counts from start to finish of tow $t$
 
-<center>
-$Z = \frac{\sum \frac{C_cX}{V}}{N}$
-</center>
+$$
+\begin{aligned}
+Z = \frac{\sum \frac{C_cX}{V}}{N}
+\end{aligned}
+$$
 
 *where:*
 
@@ -212,9 +261,11 @@ $N$ = number of cells completed
 
 From 1995-2003, the number of zooplankton per $m^{3}$ was calculated as:
 
-<center>
-$Z = \frac{\frac{CX}{V}}{S}$
-</center>
+$$
+\begin{aligned}
+Z = \frac{\frac{CX}{V}}{S}
+\end{aligned}
+$$
 
 *where:*
 
@@ -228,26 +279,28 @@ $V$ = the volume of water filtered by the net $m^{3}$
 
 $S$ = the number of Sedgewick-Rafter cells counted
 
-???????????????? Shouldnt this older formula also have $\sum$?
+**???????????????? Shouldnt this older formula also have $\sum$?**
 
 ## Data management
 
-All field data is entered into a digital Access database using forms between survey events during the season. Immediately after entry, data undergoes two rounds of ‘line-by-line’ checks, wherein all data fields are checked against the original datasheets for fidelity. At the end of the survey field season once all the fish samples have been processed in the laboratory and data entry is complete, all data is ‘finalized’ to be as accurate as possible for public use. The first step in this process is to conduct two additional line-by-lines. Next, a project lead will run a series of coded queries to analyze the underlying data distributions to detect potential outliers in the environmental data. Not all data is changed if it is flagged as an outlier (generally beyond 2 standard deviations of the mean). In most cases, outliers are real data. These queries simply alert the project lead of potential erroneous data, and care is taken to edit only data that truly needs to be edited, e.g., data that was entered incorrectly or caused by equipment failures. All resulting data edits are documented in a separate log file.
+All field data are entered into a digital Access database using eletronic forms between survey events during the season. Immediately after entry, data undergoes two rounds of ‘line-by-line’ checks, wherein all data fields are checked against the original datasheets for fidelity. At the end of the survey field season once all the fish samples have been processed in the laboratory and data entry is complete, all data is ‘finalized’ to be as accurate as possible for public use. The first step in this finalization process is to conduct two additional line-by-lines. Next, a project lead will run a series of coded queries to analyze the underlying data distributions to detect potential outliers in the environmental data. Not all data is changed if it is flagged as an outlier (generally beyond 2 standard deviations of the mean). In most cases, outliers are real data. These queries simply alert the project lead of potential erroneous data, and care is taken to edit only data that truly needs to be edited, e.g., data that was entered incorrectly or caused by equipment failures. All resulting data edits are documented in a separate log file.
 
 ## The provided data tables
 
-The “FishLength.csv”, “FishSample.csv”, “Gear.csv”, “GearCodesLkp.csv”, “MeterCorrections.csv”, "Station.csv", "StatioNCords.csv", "Survey.csv", and “Tow.csv” are available “relational tables” from the 20mm Access database. These tables are exported directly from Access in R and the only manipulations were to include relevant columns, fix unicode encoding errors, and fix float formatting errors; all underlying data collected in the field and entered into the database remained unmanipulated. The “TMM.csv” file is the integrated dataset that combines these 6 relational tables together. Users should be aware of the units of the recorded values between the relational and integrated tables, as they may differ (documented in the metadata section of the EDI publication page). All steps are coded in R and the relevant codes are provided with the EDI publication and/or housed on [trinhxuann/CDFW-IEP-Surveys Github page](https://github.com/trinhxuann/CDFW-IEP-Surveys).
+The "20mmStations.csv", "FishLength.csv", "FishSample.csv", "Gear.csv", "GearCodesLkp.csv", "MeterCorrection.csv", "Station.csv", "Survey.csv", and "Tow.csv" are available “relational tables” from the 20mm Access database. These tables are exported directly from Access in R and the only manipulations were to include relevant columns, fix unicode encoding errors, and fix float-point errors; all underlying data collected in the field and entered into the database remained as-is. The “TMM.csv” file is the integrated dataset that combines these relational tables together. Users should be aware of the units of the recorded values between the relational and integrated tables, as they may differ (documented in the metadata section of the EDI publication page). All steps are coded in R and the relevant codes are provided with the EDI publication and/or housed on [trinhxuann/CDFW-IEP-Surveys Github page](https://github.com/trinhxuann/CDFW-IEP-Surveys).
 
 ### Zero filling
 
-Zero filling is the process of assigning a count value of 0 for instances of no fish catch during a tow. No fish catch can be defined as two levels: 1) across all fish species (a tow that catches no fishes at all), or 2) specific to a singular species (a tow that catches no individuals of a particular species but does for other species). Instances of no fish catch of *any* fish species in a tow (level 1) *are not* recorded in the relational “FishSample.csv” table, but the environmental data associated with that tow *is* recorded in the relational “Tow.csv” table. The joined "TMM.csv" table flagged these instances in the `Length_NA_flag` column and filled in the corresponding catch count value (`Count`) as 0. Zero-filling was not implemented for instances of no fish catch of a particular species in a tow (level 2) in the integrated "TMM.csv" file; however, code for this step is provided in the "TTMMIntegrateEDI.R" script for users who are interested. 
+Zero filling is the process of assigning a count value of 0 for instances of no fish catch during a tow. "No fish catch" can be defined as two levels: 1) across all fish species (a tow that catches no fishes at all), or 2) specific to a singular species (a tow that catches no individuals of a particular species but does for other species). Instances of no fish catch of *any* fish species in a tow (level 1) *are not* recorded in the relational “FishSample.csv” table, but the environmental data associated with that tow *is* recorded in the relational “Tow.csv” table. The joined "TMM.csv" table flagged these instances in the `Length_NA_flag` column and filled in the corresponding catch count value (`Count`) as 0. Zero-filling was not implemented for instances of no fish catch of a particular species in a tow (level 2) in the integrated "TMM.csv" file; however, code for this step is provided in the "TTMMIntegrateEDI.R" script for users who are interested.
 
 ### Count data
-The `Count` data provided is the adjusted length frequency of each recorded length per species per tow:
+The count data provided is the adjusted length frequency of each recorded length per species per tow:
 
-<center>
-$F_{a,l} = T_{c}\bigg(\frac{F_{m,l}}{T_{m}}\bigg)$
-</center>
+$$
+\begin{aligned}
+F_{a,l} = T_{c}\bigg(\frac{F_{m,l}}{T_{m}}\bigg)
+\end{aligned}
+$$
 
 *Where:*
 
@@ -259,65 +312,27 @@ $F_{m,l}$ = measured frequency of each recorded length $l$
 
 $T_{m}$ = total number of fish measured
 
+\newpage
+
 ## Project history
 
 The table below is a timeline of critical changes to the survey methods since its inception. The years listed below are water years, which begins three months before the new calendar year on October 1.
 
 ```{r history table}
-# This is a really ugly way to make this table. It's prettier to make this in an excel file, but leaving this as is for now
+df <- readxl::read_xlsx("yearlyChanges_20mm.xlsx")
 
-df <- bind_rows(
-data.frame(waterYear = 2009, 
-           Note = "Project start. Five biweekly Delta-wide (35 stations) surveys conducted from early January to early March"),
-data.frame(waterYear = rep(2010, 3),
-           Note = c("Temporal extension of sampling temporarily for this season; six biweekly (35 stations) surveys conducted from early January to late March (this addition lasted only this season)",
-                    "Implementation of using a Hach Model #2100P Turbidimeter as Standard Operating Procedure to record turbidity in NTU's",
-                    "Recorded sampling latitude and longitude on datasheets, but this data was not entered into the database.")),
-data.frame(waterYear = rep(2011, 2),
-           Note = c("Latitude and longitude of tows recorded into database",
-                    "Yolk sac and oil globule presence noted in the data")),
-data.frame(waterYear = 2012,
-           Note = "Sixth survey permanently added"),
-data.frame(waterYear = 2013,
-           Note = NA),
-data.frame(waterYear = rep(2014, 3),
-           Note = c("Spatial extension of sampling into the Napa River as part of an agreement with the State Water Contractors (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349)",
-                    "Database was revised by Tuongvan Nguyen at ITB as part of the Bay Delta Application Hosting to move public facing data onto a secured Tier 3 server. Data is now entered into 'SLS_Local.mdb' (local server), and appended to the Tier 3 server before uploading to the public webpage",
-                    "New nets were incorporated (manufactured on 5/10/2013 by Lodi Tent and Awning) with a different Nitex Mesh purchased from Sefar (500 micron, 47% open space, part #06-500/47)")),
-data.frame(waterYear = 2015,
-           Note = "Factory k value (0.026873027) used in the `MeterCorrections` table. Flowmeters were not calibrated at UC Davis
-           due to machinery malfunction. The facility is awaiting repairs."),
-data.frame(waterYear = 2016,
-           Note = "Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season."),
-data.frame(waterYear = 2017,
-           Note = "Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season."),
-# Does this mean that the flowmeters were not sent to GO for refurbishing?
-data.frame(waterYear = 2018,
-           Note = "Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for reburbishing prior to field season"),
-data.frame(waterYear = 2019,
-           Note = c("Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season or replaced with new meters if readings are inaccurate (assessed at the end of a season)",
-                    "Spatial reduction of sampling. Ceased sampling stations within the Napa River (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349)", 
-                    "On 2019-09-10, two tables were removed from the local copy of the database: `Zooplankton` and `Zoo Catch`. These tables were appended to the database from the 20–mm database back in 2013. The SLS survey does not survey for zooplankton. More information and a copy of the tables can be found on the local server: U:/NativeFish/SmeltData/Zooplankton/SLS_Erroneous_ZooTables.xlsx")),
-data.frame(waterYear = 2020,
-           Note = NA),
-data.frame(waterYear = 2021,
-           Note = "Spatially constrained, temporal extension of sampling: two additional surveys were added in December and were limited in geographic range to the south/central Delta to inform risk of entrainment for larval Longfin Smelt."),
-data.frame(waterYear = 2022,
-           Note = "The two additional surveys in December are expanded to encompass all stations. Napa River stations (340, 342, 343, 344, 345, 346, 347, 348, and 349) have been added back to the surveys, including the supplemental December surveys.")
-)
-
-pos <- df %>% 
-  mutate(rowIndex = row_number(waterYear)) %>% 
-  arrange(waterYear) %>% 
-  group_by(waterYear) %>% 
-  mutate(groupIndex = cur_group_id()) %>% 
-  filter(groupIndex %% 2 == 1) %>% 
+pos <- df %>%
+  mutate(rowIndex = row_number(Year)) %>%
+  arrange(Year) %>%
+  group_by(Year) %>%
+  mutate(groupIndex = cur_group_id()) %>%
+  filter(groupIndex %% 2 == 1) %>%
   pull(rowIndex)
 
-df %>% 
-  kable(caption = "Table 1. History of substantial changes to the SLS Survey since its inception. Rows are highlighted per unique water year.") %>% 
-  kable_styling(c("bordered", "condensed"), html_font = "Cambria") %>% 
-  row_spec(pos, background = "#EEEEEE")
+df %>%
+  kbl(booktabs = T, longtable = T, caption = "History of substantial changes to the 20mm Survey since its inception. Rows are highlighted per unique water year.") %>%
+  row_spec(pos, background = "#EEEEEE") %>%
+  column_spec(2, width = "40em")
 ```
 
 ## Station metadata {#metadata}
@@ -325,54 +340,81 @@ df %>%
 Station theoretical latitudes and longitudes and start and end dates are provided in Table 2. A visualization of the number of surveys per water year (which encapsulates a field season) is also provided in Figure 2.
 
 ```{r, station metadata}
-LTMRdata::SLS %>% group_by(Station, Latitude, Longitude) %>%
-    slice(1, n()) %>% select(Date, Station, Latitude, Longitude) %>%
+TMM %>% 
+    group_by(Station) %>%
+    slice(1, n()) %>% 
+    select(Date, Station) %>%
     mutate(start = c("StartDate", "EndDate")) %>%
     ungroup() %>%
     tidyr::pivot_wider(names_from = "start", values_from = "Date") %>%
     # Going to just say that anything taken 30 days since the last date in the dataset == ongoing survey
-    mutate(EndDate = if_else(EndDate >= max(LTMRdata::SLS$Date) - 30, "Ongoing", as.character(EndDate))) %>%
-    kable(caption = paste0("Table 2. List of stations sampled by SLS since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station; ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey.")) %>% 
-  kable_styling(c("bordered", "condensed", "striped"), html_font = "Cambria")
+    mutate(EndDate = if_else(EndDate >= max(TMM$Date) - 30, "Ongoing", as.character(EndDate)),
+           order = ifelse(EndDate %in% "Ongoing", 0, as.numeric(factor(EndDate)))) %>% 
+    arrange(order, Station, StartDate) %>% 
+    select(-order)%>% 
+    # Joining to mapDF to grab the type of station
+    left_join(select(mapDF, Station, Status), by = "Station") %>% 
+    kbl(booktabs = T, longtable = T, caption = paste0("List of stations sampled by 20mm since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station; ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey. The high outflow stations are ongoing stations, however, end dates are provided due to the intermittency of these stations.")) %>% 
+    kable_styling(latex_options = "striped")
 ```
 
-<br><br>
 
-```{r, station figure, fig.width=22, fig.height=18, fig.cap="Figure 2. The number of times a station was surveyed per water year is shown in various colors, following documentation present in Table 1. No color indicates that a station was not sampled for that water year."}
-LTMRdata::SLS %>%
+```{r, station figure, fig.width=22, fig.height=18, fig.cap="The number of times a station was surveyed per water year is shown in various colors, following documentation present in Table 1. No color indicates that a station was not sampled for that water year."}
+TMM %>%
+  filter(Station %in% unique(mapDF$Station)) %>% 
+  distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)),
+           Station, Survey) %>%
+  group_by(waterYear, Station, Survey) %>%
+  count() %>%
+  group_by(waterYear, Station) %>%
+  summarise(numSurvey = sum(n),
+            .groups = "drop") %>% 
+  mutate(stationFactor = as.numeric(factor(Station, 
+                                           levels = sort(unique(Station))))) %>% 
+  {
+    ggplot(data = ., aes(waterYear, stationFactor, 
+                         fill = factor(numSurvey, levels = sort(unique(numSurvey))))) +
+      geom_tile(color = "black") +
+      scale_y_continuous(sec.axis = sec_axis(~.*1,
+                                             breaks = seq(2, max(.$stationFactor), 2),
+                                             labels = filter(., stationFactor %in%
+                                                               seq(2, max(.$stationFactor), 2)) %>%
+                                               pull(Station) %>%
+                                               unique() %>%
+                                               as.character()),
+                         breaks = seq(1, max(.$stationFactor), 2),
+                         labels = filter(., stationFactor %in% seq(1, max(.$stationFactor), 2)) %>%
+                           pull(Station) %>%
+                           unique() %>%
+                           as.character(),
+                         expand = expansion(add = c(0.6, 0.6))) +
+      labs(title = "Number of surveys per station per water year",
+           fill = "Number of surveys",
+           x = "Water Year",
+           y = "Station") +
+      scale_fill_viridis_d() +
+      theme_classic(base_size = 32) +
+      guides(fill = guide_legend(nrow = 1)) +
+      theme(legend.position = "bottom",
+            axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  }
+
+
+TMM %>%
+  filter(Station %in% unique(mapDF$Station)) %>% 
   distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)),
            Station, Survey) %>%
   group_by(waterYear, Station, Survey) %>%
   count() %>%
   group_by(waterYear, Station) %>%
   summarise(numSurvey = sum(n)) %>%
-  {
-    ggplot(data = ., aes(waterYear, Station, fill = factor(numSurvey, levels = sort(unique(.$numSurvey))))) +
-      geom_tile(color = "black") +
-      scale_y_discrete(limits = rev) +
-      scale_fill_manual(values = c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF")) +
-      labs(title = "Number of surveys per station per water year",
-           fill = "Number of surveys",
-           x = "Water Year") +
-      theme_classic(base_size = 35) +
-      theme(legend.position = "bottom")
-  }
-
-LTMRdata::SLS %>%
-  distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)),
-           Station, Survey) %>%
-  group_by(waterYear, Station, Survey) %>%
-  count() %>%
-  group_by(waterYear, Station) %>%
-  summarise(numSurvey = sum(n)) %>% 
   rename("Water Year" = waterYear,
-         "Number of Surveys" = "numSurvey") %>% 
-  kable(caption = "Table 3. Frequency of number of surveys at each station in the SLS Survey per water year since its inception in 2009.") %>% 
-  kable_styling(c("bordered", "condensed", "striped"), html_font = "Cambria") %>% 
-  scroll_box(width = "100%", height = "500px")
+         "Number of Surveys" = "numSurvey") %>%
+  kbl(booktabs = T, longtable = T, caption = "Frequency of number of surveys at each station in the 20mm Survey per water year since its inception in 1995") %>%
+  kable_styling(latex_options = "repeat_header")
 
 # This is the grayscale version that is 100% colorblind friendly and contrast-correct:
-# LTMRdata::SLS %>%
+# TMM %>%
 #   distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)),
 #            Station, Survey) %>%
 #   group_by(waterYear, Station, Survey) %>%
@@ -392,10 +434,3 @@ LTMRdata::SLS %>%
 #       theme(legend.position = "bottom")
 #   }
 ```
-
-<br>
-
-[Last updated `r format(Sys.time(), "%d %B, %Y")`]{style="float:right"}
-
-<!-- This ends the document, removing white space caused by the TOC float -->
-<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
