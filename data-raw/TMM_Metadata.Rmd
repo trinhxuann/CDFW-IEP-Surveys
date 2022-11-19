@@ -145,7 +145,7 @@ m %>%
           vwidth = 850, vheight = 500)
 ```
 
-![The geographic range of work of the 20mm Survey. Each point represents the location of a sampling station, totalling to 52 stations of primary interest. Stations are colored according to their relationship to the 20mm Index calculation, where blue represents stations that have been included since the advent of the calculation, green since 2022, and red represents high outflow stations that are not included.](20mmMap.png){width=600px}
+![The geographic range of work for the 20mm Survey. Each point represents the location of a sampling station, totaling to 52 stations of primary interest. Stations are colored according to their relationship with the 20mm index calculation, where blue represents stations that have been included since the inception of the survey (1995), green represents stations that were added in 2008 and have been precluded from the calculation, and red represents high outflow stations that are not included in the calculation.  ](20mmMap.png){width=600px}
 
 **Number of sites:** `r length(unique(filter(mapDF, Status != "highOutflow")$Station))` stations that are sampled yearly. During high outflow years, `r length(unique(filter(mapDF, Status == "highOutflow")$Station))` additional stations are sampled. See the [$\color{link}{\text{metadata section}}$](#metadata) for additional details of each station.
 

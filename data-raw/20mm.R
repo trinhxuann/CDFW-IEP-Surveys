@@ -10,6 +10,7 @@
 # Libraries needed
 library(dplyr, warn.conflicts = F)
 library(tidyr)
+library(lubridate)
 library(DBI)
 library(odbc)
 library(stringr)
@@ -125,13 +126,17 @@ read20mmAccess <- function(surveyName = "20mm",
   
   TTmmTables[[stationPosition]] <- TTmmTables[[stationPosition]] %>% 
     mutate(across(c(LatDeg, LatMin, LatSec, LonDeg, LonMin, LonSec), ~as.numeric(.x)))
+  
   # Tow, changing time to PST/PDT
   towPosition <- which(sapply(TTmmTables,
                               function(tables) any(grepl("TowTime",
                                                          x = names(tables),
                                                          ignore.case = T))))
   
-  attr(TTmmTables[[towPosition]]$TowTime, "tzone") <- "America/Los_Angeles"
+  TTmmTables[[towPosition]] <- TTmmTables[[towPosition]] %>% 
+    mutate(TowTime = as.POSIXct(as.numeric(TowTime), 
+                                origin = as.POSIXct("1970-01-01", tz = "America/Los_Angeles"),
+                                tz = "America/Los_Angeles"))
   
   # Gear
   gearPosition <- which(sapply(TTmmTables,
@@ -173,42 +178,42 @@ read20mmAccess <- function(surveyName = "20mm",
   setTxtProgressBar(pb, 2)
   pullTime <- Sys.time()
   
-  # Round all numeric values to 7 digits...This gets rid of "ghost numbers", as known by Bay Study,
-  # that are caused by the use of "single" field size in Access. When converted to "double"
-  # in R and Excel, the addition of additional decimal points causes non-zero digits to appear
-  # to fill in the missing spaces. This is simply a limitation of computer arithmetics
-  substrRight <- function(x, n) {
-    substr(x, nchar(x) - n + 1, nchar(x))
-    # Function sourced from: https://stackoverflow.com/questions/7963898/extracting-the-last-n-characters-from-a-string-in-r?rq=1
-  }
-  
-  cat("\nChecking for float issues.", fill = T)
-  
-  floatIssue <- lapply(TTmmTables, function(x) {
-    df <- x %>% 
-      summarise(across(where(is.numeric), 
-                       # Will check for 14 digits, since conversion of "single" to double
-                       ~suppressWarnings(sum(as.numeric(substrRight(sprintf("%.14f", .x), 1)), na.rm = T)))) %>% 
-      select_if(~ !is.numeric(.) || sum(.) != 0) %>% 
-      names()
-  })
-  
-  # Which data frames have this float issue:
-  floatIssueDF <- names(which(sapply(floatIssue, function(x) !identical(x, character(0)))))
-  # Within the affected DFs, round the affected columns to 7 and then 2 digits
-  # I believe the step to round to 7 digits is not needed but does not really affect computational speed
-  # Will leave because mechanically, "single" field size is 7 digits long.
-  
-  for (i in floatIssueDF) {
-    
-    columnsAffected <- floatIssue[[i]]
-    
-    cat("Column(s)", paste(columnsAffected, collapse = ", "), "in the", i, "data table experienced float issues. Rounding accordingly.", fill = T)
-    
-    TTmmTables[[i]] <- TTmmTables[[i]] %>% 
-      mutate(across(all_of(columnsAffected), ~round(.x, 7)),
-             across(all_of(columnsAffected), ~round(.x, 2)))
-  }
+  # # Round all numeric values to 7 digits...This gets rid of "ghost numbers", as known by Bay Study,
+  # # that are caused by the use of "single" field size in Access. When converted to "double"
+  # # in R and Excel, the addition of additional decimal points causes non-zero digits to appear
+  # # to fill in the missing spaces. This is simply a limitation of computer arithmetics
+  # substrRight <- function(x, n) {
+  #   substr(x, nchar(x) - n + 1, nchar(x))
+  #   # Function sourced from: https://stackoverflow.com/questions/7963898/extracting-the-last-n-characters-from-a-string-in-r?rq=1
+  # }
+  # 
+  # cat("\nChecking for float issues.", fill = T)
+  # 
+  # floatIssue <- lapply(TTmmTables, function(x) {
+  #   df <- x %>% 
+  #     summarise(across(where(is.numeric), 
+  #                      # Will check for 14 digits, since conversion of "single" to double
+  #                      ~suppressWarnings(sum(as.numeric(substrRight(sprintf("%.14f", .x), 1)), na.rm = T)))) %>% 
+  #     select_if(~ !is.numeric(.) || sum(.) != 0) %>% 
+  #     names()
+  # })
+  # 
+  # # Which data frames have this float issue:
+  # floatIssueDF <- names(which(sapply(floatIssue, function(x) !identical(x, character(0)))))
+  # # Within the affected DFs, round the affected columns to 7 and then 2 digits
+  # # I believe the step to round to 7 digits is not needed but does not really affect computational speed
+  # # Will leave because mechanically, "single" field size is 7 digits long.
+  # 
+  # for (i in floatIssueDF) {
+  #   
+  #   columnsAffected <- floatIssue[[i]]
+  #   
+  #   cat("Column(s)", paste(columnsAffected, collapse = ", "), "in the", i, "data table experienced float issues. Rounding accordingly.", fill = T)
+  #   
+  #   # TTmmTables[[i]] <- TTmmTables[[i]] %>% 
+  #   #   mutate(across(all_of(columnsAffected), ~round(.x, 7)),
+  #   #          across(all_of(columnsAffected), ~round(.x, 2)))
+  # }
   
   setTxtProgressBar(pb, 3)
   floatTime <- Sys.time()

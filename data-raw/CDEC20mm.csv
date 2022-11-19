@@ -1,0 +1,48 @@
+20-mm Station,CDEC station 1,CDEC station 2,CDEC station 3,Comment
+323,,,,No CDEC stations near
+340,,,,No CDEC stations near
+342,,,,No CDEC stations near
+343,,,,No CDEC stations near
+344,,,,No CDEC stations near
+345,,,,No CDEC stations near
+346,,,,No CDEC stations near
+405,MRZ,,,
+411,C16,PCT,,
+418,FLT,C16,,
+501,C16,PCT,RYC,
+504,PCT,C24,,
+508,MAL,PTS,C31,
+513,C31,C05,CSE,
+519,HON,C24,,
+520,PTS,,,
+602,GZL,GZB,,
+606,HUN,,,
+609,BDL,,,
+610,NSL,ROR,,
+703,C10,,,
+704,C10,,,
+705,TMS,,,
+706,SDI,EMM,,
+707,TMS,,,
+711,SOI,,,
+716,LIB,,,
+801,C05,,,
+804,ANH,,,
+809,SJJ,,,
+812,TWI,FCT,,
+815,SAL,OSJ,MOK,
+901,FRK,BET,,
+902,HOL,HLL,,
+906,,,,No CDEC stations near
+910,TRN,,,
+912,SJC,,,
+914,MDM,,,
+915,MDM,,,
+918,WCI,CCW,,
+919,STI,LPS,,
+718,,,,No CDEC stations near
+719,DWS,,,
+720,BKS,,,
+723,MIR,DWS,,
+724,MIR,,,
+726,HWB,,,
