@@ -366,8 +366,7 @@ joinCheckSteps$lengthFin <- compareDF(SLS %>%
 # If any of the QAQC steps to check for data joining errors has an error, you will need to check
 # what happened here
 if (any(!unlist(joinCheckSteps))) {
-  warning("There are unaccounted for additions/deletions to the joining process. Check steps.", call. = F)
-  browser()
+  stop("There are unaccounted for additions/deletions to the joining process. Check steps.", call. = F)
 } else {
   SLS <- SLS %>% 
     # Removing CatchID and entryorder as they are not relevant to the dataset

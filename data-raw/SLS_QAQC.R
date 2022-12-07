@@ -9,6 +9,7 @@ library(tidyr)
 library(lubridate)
 library(stringr)
 library(leaflet)
+library(geosphere)
 
 # Reading in the base tables ----------------------------------------------
 # This script should be ran after creating the databases script. I will assume
@@ -139,7 +140,7 @@ plotGPS <- function(df, station = NULL, Year = NULL, ...) {
 
 # Example: this plots ALL stations across a year of interest; Year can be left blank if
 # you want all stations across all years plotted (will be slow though)
-plotGPS(GPSDF, Year = 2021, title = "Source")
+plotGPS(GPSDF, Year = 2022, title = "Source")
 plotGPS(GPSDF, Year = 2022, station = 809, title = "Source")
 
 # Use findOutlierGPS after running plotGPS and visually determining which stations/year may have 
@@ -169,8 +170,7 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
   # the is numeric group is for AFTER cluster have been chosen, so for dfClust df in the findOutlierGPS() function
   if (!is.null(Year)) df <- filter(df, SeasonYear %in% Year | group %in% "TheoreticalCoords")
   
-  d <- geo.dist(select(df, Long, Lat) %>% 
-                  na.omit())
+  d <- geo.dist(select(df, Long, Lat))
   hc <- hclust(d)
   
   # There has to be more than two clusters to plot
@@ -186,13 +186,16 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
       # A bit of coding to get the theoretical coords to always be cluster 1
       # First, convert group into a factor with levels to arrange correctly
       # Second, create groupOrder as a factor and pull the numeric version of it to assign as clusters
+      # ***"group" is essential here as it is used by the plotGPS() funciton below for the legend
+      # This should be the clusters
       mutate(source = factor(group, levels = c("TheoreticalCoords", "Tow")),
-             groupOrder = ifelse(group == "TheoreticalCoords", group, clusters)) %>% 
+             Cluster = clusters,
+             group = Cluster) %>% 
       arrange(source) %>% 
-      mutate(groupOrder = factor(groupOrder, levels = unique(.$groupOrder)),
-             group = as.numeric(groupOrder)) %>% 
-      group_by(group) %>% 
-      add_tally() %>% 
+      # mutate(groupOrder = factor(groupOrder, levels = unique(.$groupOrder)),
+      #        group = as.numeric(groupOrder)) %>%
+      # group_by(group) %>%
+      # add_tally() %>%
       ungroup()
     
     # Making the assumption here that if it is NOT in the same group as the theoretical coordinates,
@@ -200,16 +203,22 @@ findOutlierGPS <- function(df, station = NULL, Year = NULL,
     # Find what "group" is the theoretical cluster; should generally be 1
     theoreticalCluster <- dfClust %>% 
       filter(is.na(Date), is.na(Temp), is.na(LonD)) %>% 
-      pull(group)
+      pull(Cluster)
     
     dfClust <- dfClust %>% 
-      mutate(Outlier = ifelse(group == theoreticalCluster, F, T))
-    
+      # Removing this for now; to have an outlier column, need a "criteria" to make them outliers
+      # Need to work through the thinking of this. For now, this will simply return the clusters
+      # for the ES to manually evaluate.
+      # One thought I have is to use historical "corrected" GPS coordinates and develop a perimeter 
+      # around the theoretical that would mark stations as outliers or not. Need to make sure that we
+      # have no outliers in our datasets before this feature comes online.
+      mutate(Outlier = ifelse(Cluster == theoreticalCluster, F, T))
+ 
     if (plot) print(plotGPS(dfClust, station = station, Year = Year, title = "Cluster"))
-    
+   
     dfClust %>% 
       select(Date, SeasonYear, Survey, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
-             Lat, Long, Comments, Outlier) %>% 
+             Lat, Long, Comments, source, Cluster, Outlier) %>%   
       arrange(-Outlier)
   } else {
     cat("Pick a the number of clusters, k using the map displayed. \n")
@@ -974,4 +983,4 @@ saveSheet <- lapply(outliers, function(x) mutate(x, IsOutlier = NA, ChangedTo = 
                                                  across(where(is.character), ~str_replace_all(.x, "\uFFFD", ""))))
 
 # Saving the file; this will save to the current directory, which by default is in the parent folder; will change this later
-writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "SLS", paste0("SLS_outliers_", today(), ".xlsx")))
+writexl::write_xlsx(saveSheet, file.path("data-raw", "Outliers", "SLS", paste0("SLS_outliers_", gsub(" |:", "_", now()), ".xlsx")))
