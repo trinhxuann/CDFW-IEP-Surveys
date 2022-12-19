@@ -27,11 +27,19 @@ pullCDEC <- function(station, sensor = NULL,
       gsub("(^[A-Z])", "\\L\\1", ., perl = T)
     
     availableData <- session %>% 
-      html_table() %>% 
-      setNames(tableNames) %>% 
-      arrange(sensorNumber) %>% 
-      mutate(duration = gsub("\\(|\\)", "", duration),
-             gage = station)
+      html_table()
+  
+    if (nrow(availableData) == 0) {
+      availableData <- lapply(tableNames, function(x) data.frame(x = NA) %>% 
+                                rename(!!x := x)) %>% 
+        bind_cols()
+    } else {
+      availableData <- availableData %>% 
+        setNames(tableNames) %>% 
+        arrange(sensorNumber) %>% 
+        mutate(duration = gsub("\\(|\\)", "", duration),
+               gage = station)
+    }
     
     if (is.null(sensor)) {
       if (isTRUE(verbose)) {
@@ -137,24 +145,111 @@ pullMetadataCDEC <- function(station, list = T) {
   metadata
 }
 
+# Function to pull the closest cdec station to a coordinate
+calcNearestCDEC <- function(df, cdecGPS, 
+                            cdecMetadata = NULL,
+                            variable = c("temp", "turbidity", "ec"), 
+                            waterColumn = c("top", "bottom")) {
+
+  if (variable == "ec") {
+    variableWanted <- "elec.* conduct.* micro"
+  } else {
+    if (variable == "temp") {
+      variableWanted <- "(temp).*(water)"
+    } else variableWanted <- variable
+  }
+  
+  waterColumnWanted <- ifelse(waterColumn %in% "bottom", "(lower|bottom)", waterColumn)
+  
+  variableWanted <- ifelse(waterColumn == "bottom", 
+                           paste0(variableWanted, ".*", waterColumnWanted), 
+                           variableWanted)
+  
+  closestMetadata <- lapply(1:nrow(df), function(x) {
+    
+    distanceMatrix <- distm(data.frame(longitude = df$long[[x]], 
+                                       latitude = df$lat[[x]]),
+                            data.frame(longitude = cdecGPS$longitude, 
+                                       latitude = cdecGPS$latitude),
+                            fun = distVincentyEllipsoid)
+    
+    distanceData <- data.frame(cdecStation = cdecGPS$station,
+                               distance = as.vector(distanceMatrix)/1609.344,
+                               sktStation = df$Station[x]) %>% 
+      arrange(distance)
+    
+    if (!is.null(cdecMetadata)) {
+      
+      closestGage <- cdecMetadata %>% 
+        filter(grepl(variableWanted, sensorDescription, ignore.case = T))
+      
+      if (waterColumn != "bottom") {
+        closestGage <- closestGage %>% 
+          filter(!grepl("(lower|bottom)", x = sensorDescription, ignore.case = T))
+      }
+      
+      closestValidGage <- closestGage %>% 
+        left_join(distanceData, by = c("gage" = "cdecStation")) %>% 
+        slice_min(distance)
+      
+      metadata <- cdecMetadata %>% 
+        filter(gage == unique(closestValidGage$gage)) %>% 
+        mutate(distance = unique(closestValidGage$distance))
+    } else {
+      
+      for (i in 1:nrow(distanceData)) {
+        metadata <- pullMetadataCDEC(distanceData$cdecStation[i], list = F) %>% 
+          mutate(distance = unique(distanceData$distance[i]))
+        
+        if (waterColumn == "bottom") {
+          waterColumnPass <- any(grepl(variableWanted, 
+                                       metadata$sensorDescription, ignore.case = T))
+        } else {
+          waterColumnPass <- metadata$sensorDescription[which(grepl(variableWanted, 
+                                                                    metadata$sensorDescription, 
+                                                                    ignore.case = T))] %>% 
+            grepl("lower|bottom", x = ., ignore.case = T) %>% 
+            {any(!.)}
+        }
+        if (isTRUE(waterColumnPass)) break()
+      }
+    }
+    
+    rownames(metadata) <- NULL
+    
+    metadata %>% 
+      mutate(Station = df$Station[[x]])
+  })
+}
+
+# Function to populate cdec values (temp, turb, ec) to a list of date time of a survey station
 popCDEC <- function(df, 
                     cdec,
                     metadata,
                     variable = c("temp", "turbidity", "ec"), 
-                    waterColumn = c("top", "lower")) {
-  
+                    waterColumn = c("top", "bottom")) {
+
   if (nrow(df) == 0) {
     message("Data frame has no data.")
     return(data.frame())
   }
   
-  variableWanted <- ifelse(variable %in% "ec", "ELEC.* CONDUCT.* MICRO", variable)
-  waterColumnWanted <- match.arg(waterColumn)
+  if (variable == "ec") {
+    variableWanted <- "elec.* conduct.* micro"
+  } else {
+    if (variable == "temp") {
+      variableWanted <- "(temp).*(water)"
+    } else variableWanted <- variable
+  }
+  
+  waterColumnWanted <- ifelse(waterColumn %in% "bottom", "(lower|bottom)", waterColumn)
   
   joinedDF <- left_join(df, cdec, by = "Station") %>% 
     data.frame() %>% 
     pivot_longer(c(first, second, third), 
                  names_to = "priority", values_to = "cdecGage")
+  
+  names(metadata) <- sapply(metadata, function(x) unique(pull(x, gage)))
   
   filteredMetadata <- lapply(na.omit(unique(joinedDF$cdecGage)), function(x) {
     
@@ -162,7 +257,7 @@ popCDEC <- function(df,
       filter(grepl(variableWanted, sensorDescription, ignore.case = T))
     
     if (nrow(dfFiltered) > 1) {
-      if (waterColumnWanted == "lower") {
+      if (waterColumnWanted == "bottom") {
         dfFilteredWaterColumn <- dfFiltered %>%
           filter(grepl(waterColumnWanted, sensorDescription, ignore.case = T))
         if (nrow(dfFilteredWaterColumn) != 0) {
@@ -222,11 +317,11 @@ popCDEC <- function(df,
                    dateStart = min(dates), 
                    dateEnd = max(dates) + 1) %>% 
       right_join(x, by = c("obsDate" = "SampleDate", "stationId" = "cdecGage"))
-    
+   
     if (is.null(df)) return(data.frame(valueCDEC = NA,
                                        closestTime = NA))
     
-    towTimeIndex <- sym(names(df)[which(sapply(df, function(x) inherits(x, "POSIXct")) & !names(df) %in% "dateTime")])
+    towTimeIndex <- sym(names(df)[which(sapply(df, function(x) inherits(x, "POSIXct")) & names(df) %in% "TowTime")])
     
     df <- df %>% 
       mutate(closestTime = abs(difftime(!!towTimeIndex, dateTime, units = "mins"))) %>% 
@@ -245,7 +340,7 @@ popCDEC <- function(df,
     bind_rows() %>% 
     arrange(rowNumber) %>% 
     select(-rowNumber)
-  
+
   joinedDFCDEC %>% 
     select(-rowNumber) %>% 
     bind_cols(pulledData) %>% 
@@ -267,7 +362,7 @@ parPopCDEC <- function(df,
   clusterExport(cl, varlist = c("pullCDEC", "metadata"))
   
   variableWanted <- ifelse(variable %in% "ec", "ELEC.* CONDUCT.* MICRO", variable)
-  waterColumnWanted <- match.arg(waterColumn)
+  waterColumnWanted <- ifelse(waterColumn %in% "bottom", "(lower|bottom)", waterColumn)
   
   joinedDF <- left_join(df, cdec, by = "Station") %>% 
     data.frame() %>% 
