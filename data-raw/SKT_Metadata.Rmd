@@ -1,0 +1,387 @@
+---
+title: Interagency Ecological Program San Francisco Estuary Spring Kodiak Trawl Survey (SKT)
+  Metadata
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    toc: yes
+    toc_float:
+      toc_collapsed: yes
+    toc_depth: 2
+    number_sections: no
+    theme: lumen
+header-includes:
+   - \usepackage[singlelinecheck=false]{caption}
+---
+
+<!-- Changing things to be at least 12 pt font -->
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+\definecolor{link}{HTML}{0853BF}
+
+```{r setup, include=FALSE}
+# Loading libraries
+
+library(kableExtra)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(tidyr)
+library(mapview)
+library(readxl)
+library(cowplot)
+
+options(scipen = 999, width = 80)
+
+knitr::opts_chunk$set(dpi=320, width = 150, fig.width=18, fig.height=10, warning=FALSE, message=F, dev = c("cairo_pdf"), dev.args = list(pointsize = 13), echo = F)
+
+makeKable <- function(df, caption = NULL, width = "100%", ...) {
+  
+  table <- kbl(df, booktabs = T, caption = caption) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), position = "left", ...)
+  
+  table
+}
+
+# Joined SKT dataset
+SKT <- read.csv(file.path("SKT", "sktJoined.csv")) %>%
+  mutate(SampleDate = as.Date(SampleDate))
+```
+
+## Study Management
+**IEP Study Name:** Spring Kodiak Trawl (SKT)
+
+**Agency:** California Department of Fish and Wildlife (CDFW), Bay Delta Region (R3)
+
+**Office Location:**
+
+Address: 2109 Arch Airport Rd Suite 100, Stockton, CA 95206
+
+Phone: (209) 234-3420 Fax: (209) 234-3689
+
+**Program manager:** James Hobbs, [James.Hobbs@wildlife.ca.gov](mailto:James.Hobbs@wildlife.ca.gov)
+
+**Project lead:** Vanessa Mora, [vanessa.mora@wildlife.ca.gov](mailto:vanessa.mora@wildlife.ca.gov)
+
+\newpage
+## Study Overview
+**Purpose/Objective:** The SKT fish survey monitors and provides information on pre-spawning and spawning Delta Smelt (*Hypomesus transpacificus*) in the upper San Francisco Estuary (SFE). The objectives of this project are to:
+\vspace{-3truemm}
+
+  1) improve the ability to detect Delta Smelt, 
+  2) obtain sexual maturity data of adult Delta Smelt, and 
+  3) provide results to scientists and managers on a near real-time basis to aid in resource management decisions. 
+\vspace{-2truemm}
+
+**Data collected:** Surface water temperature (°C), surface electro-conductivity (EC, $\mu$S/cm, normalized at 25 °C), Secchi depth (cm), water volume (m$^3$), tidal stage, and identification, counts, and lengths (mm, fork lengths or total length for species without a forked tail) of fishes to the lowest possible taxon.
+
+**History:** The Spring Midwater Trawl (SMWT) was an extension of the Fall Midwater Trawl (FMWT) Survey and sampled the months of January, February, and March from 1991-2001. Data collected by the SMWT provided information on the distribution of pre-spawning Delta Smelt to assist in real-time management of water export operations within the Delta. In 1995, a net evaluation studies conducted by the Interagency Ecological Program (IEP) compared the relative efficiency of three types of nets (Chipps Island Trawl, Midwater trawl, and Kodiak trawl) and determined that the most effective net for sampling adult Delta Smelt was the Kodiak Trawl. As such, in 2002, the SMWT was changed from an obliquely towed Midwater trawl to a surface towed Kodiak trawl. 
+
+## Study Design
+
+**Geographic range of work:** 
+```{r, overall map, echo = F, results='asis'}
+# This file is simply the 47 stations in the StationCords.csv file + the 5 high outflow stations
+# I've added the status column myself for plotting below
+
+mapDF <- SKT %>% 
+  distinct(StationCode, LatitudeTheoretical, LongitudeTheoretical) %>% 
+  drop_na() %>%
+  mutate(Status = ifelse(StationCode != 719, "Core", "Noncore"),
+         LongitudeTheoretical = -LongitudeTheoretical) %>% 
+    mutate(Status = factor(Status,
+                           levels = c("Core", "Noncore")),
+           offsetX = 18,
+           offsetY = 0
+           # offsetX = case_when(Station %in% 334 ~ 10,
+           #                     Station %in% c(335) ~ 0,
+           #                     Station %in% 329 ~ -2,
+           #                     Station %in% 336 ~ -5,
+           #                        Station %in% 328 ~ c(0),
+           #                        Station %in% 723 ~ c(-18),
+           #                        TRUE ~ c(18)),
+           # offsetY = case_when(Station %in% c(334, 335, 336) ~ c(15),
+           #                     Station %in% 329 ~ 13,
+           #                        Station %in% 328 ~ c(-15),
+           #                        Station %in% 723 ~ c(0),
+           #                        TRUE ~ c(0))
+           )
+
+# To color the stations on the map accordingly
+# A bit strange how the order of the colors do not seem to follow the levels of the domain?
+pal <- colorFactor(c("#3B4992FF", # core
+                     "#EE0000FF"), # noncore
+                   domain = levels(mapDF$Status))
+
+m <- leaflet(mapDF) %>%
+    addProviderTiles(providers$Esri.OceanBasemap)
+
+stationList <- mapDF %>%
+    split(., .$StationCode)
+
+names(stationList) %>%
+  purrr::walk(function(mapDF) {
+    m <<- m %>%
+      addCircleMarkers(data = stationList[[mapDF]],
+                       lng=~LongitudeTheoretical, lat=~LatitudeTheoretical,
+                       label = ~as.character(StationCode),
+                     color = ~pal(Status),
+                     radius = 6,
+                     stroke = F, fillOpacity = 0.8,
+                     labelOptions = labelOptions(noHide = T,
+                                                 offset = ~c(offsetX, offsetY),
+                                                 direction = "center",
+                                                 textOnly = T,
+                                                 textsize = "12px"))
+  })
+
+m %>%
+  addLegend(pal = pal, values = ~Status, opacity = 1) %>%
+  setView(lat = 38.09690863981991, lng = -121.89539973367937, zoom = 10) %>%
+  # fitBounds(lat1 = 37.88407279406805, lng1 = -122.43901959010311,
+  #             lat2 = 38.2891852849442, lng2 = -121.38259035764148) %>%
+  mapshot(file = "sktMap.png", cliprect = "viewport",
+          vwidth = 850, vheight = 500, zoom = 5)
+```
+
+![The geographic range of the SKT Survey covers a total of `r SKT %>% distinct(StationCode, LatitudeTheoretical, LongitudeTheoretical) %>% drop_na %>% nrow()` primary sampling stations, each represented by a point on the map. The stations are color-coded based on their relationship with the SKT index calculation: blue "core" stations that are included in the calculation, and red "non-core" station(s) that is/are not included.](sktMap.png){width=600px}
+
+**Number of sites:** `r length(unique(filter(mapDF, Status != "Noncore")$StationCode))` core stations that have been sampled since 2002 (survey's inception). Beginning in 2005, `r length(unique(filter(mapDF, Status == "Noncore")$Station))` additional station was added. See the [$\color{link}{\text{metadata section}}$](#metadata) for additional details.
+
+**Data range:** `r min(SKT$SampleDate)` to `r max(SKT$SampleDate)` (YYYY-mm-dd)
+
+**Sampling frequency**: Sampling begins January and is conducted monthly. Sampling ends in the late spring (**month? May?**) or when spawning Delta Smelt can no longer be detected **(What are these specific ending conditions?)**. Standard sampling surveys are numbered 1-9, while supplemental sampling surveys are identified as $\ge$ 10.
+
+## Field Sampling Methods
+
+**Net:** The SKT employs a standard Kodiak trawl. A weighted foot-rope and head-rope with floats allows the trawl to fish the top 1.8 meter of the water column. Specifications:
+\vspace{-3truemm}
+
+  1. Net length: 19.8 m
+  2. Mouth opening (fully opened): 7.62 m by 1.83 m (an area of 13.9446 $m^{2}$) 
+  3. Mesh size: variable; from 2" knotted stretched mesh at the mouth, decreasing by $\frac{1}{2}^{"}$ across a series of 5 panels to $\frac{1}{4}^{"}$ knotless stretched mesh at the cod-end. The cod end mesh size has changed several times over the years, specifically in 2004 and 2007 (Table 4). New nets were incorporated in 2014 but were made to specifications of the previous nets.
+  
+\vspace{-2truemm}
+**Biotic Data:** The SKT is a fish survey with the primary goal of monitoring Delta Smelt, which is a surface oriented fish. However, all other fish, jellyfish, and shrimp species are also sampled if captured during a tow (all other invertebrate are not sampled; see Table 6). With exceptions of years early in the program (Table 4), all samples are processed, counted, and measured on board after each tow; only unidentifiable fish are returned to the CDFW Stockton laboratory for positive identification.
+
+**Environmental Data:** Surface water temperature, surface turbidity, surface electroconductivity, Secchi depth, flow meter readings, water depth, and tidal stage are recorded (Table 1). Prior to each tow at each station, Secchi depth is measured off the shaded side of the boat, the surface of the water is sampled using a bucket, depth (ft) is recorded using a digital depth finder from the boat's navigation system, and tide data is documented visually by the captain (high slack, ebb, low slack, or flood). Immediately after the tow begins, a flow meter is tossed into the water and the beginning flow meter reading is recorded. Water temperature (°C), water turbidity, and water EC are then quickly recorded from the water sample taken prior to the start of the tow. At the end of the tow, the final flow meter reading is recorded.
+
+```{r table of equipment used to measure abiotic data}
+data.frame(Variable = c("Water temperature (surface)", "Water EC (surface)", "Water turbidity (surface)", "Secchi depth", "Flow meter", "Depth", "Tide"),
+           Equipment = c("YSI 30", "YSI 30", "Hach Model #2100P", "Two meter sticks", "", "Onboard meter", "Visual"),
+           Unit = c(paste0("\U00B0", "C"), paste0("\U00B5", "m/cm"), "NTU", "m", "", "Feet", "")) %>% 
+  kbl(booktabs = T, linesep = "", caption = "The SKT collects various environmental data per tow per station.") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
+
+## FILL in missing data for flow meter equipment
+
+\newpage
+**Tow:**
+\vspace{-3truemm}
+
+  1. Two boats are required to execute a Kodiak trawl: a net and a chase boat
+  2. Gear deployment: the boats should be positioned so that the designated station coordinates is halfway through the tow. To execute the tow, the tied-off cod-end of the net is thrown overboard and the bridles are guided by two deckhands over the stern to prevent snags. The net is allowed to free-spool until the warp line is out 110 feet. Once the winches have stopped, the chase boat will come alongside with its port side paralleled to the net boat to attach one side of the net. Once both sides are attached, both boats are put into forward gear, the net is opened, and the tow begins. Both boats are to remain parallel throughout the tow.
+  3. Duration: 9.5 minutes (9 minutes and 30 seconds)
+  4. Tows per station: 1
+  5. Re-tows: required if a tow is invalid for any reason, including any deviations from protocols. Examples include: abnormal flow meter readings (10,000 - 30,000), the cod-end has become untied, the net gets snagged, the net did not open correctly, or the net has filled with a large amount of mud or peat. If more than 20 minutes have elapsed since the environmental data were recorded, a new set must be recorded.
+  6. Habitat type bias(es): the Kodiak net only surveys the top 1.8 m of the water column and thus is biased to surface-oriented fishes.
+
+\vspace{-2truemm}
+**Content processing:** All fish are measured up to 50 individuals to the nearest mm fork length or total length (non-forked caudal tail). If there are more than 50 individuals, 50 individuals are randomly selected for measurements and the rest are enumerated as plus-counts or sub-sample. 
+\vspace{-3truemm}
+
+  1. Plus-counts is defined as counting all remaining individuals without taking length measurements to get a total catch number.
+  2. Subsampling is defined as counting individuals into sub-sample containers (usually 1 liter) and multiplying that count by the total number of sub-sample containers required to hold all remaining individuals. For example, 50 individuals are counted and measured + 100 individuals are required to fill a 1-liter container * 5 total 1-liter containers to hold all non-measured individual = 550 fish caught. Subsampling can occur for extremely large catches, such as of Threadfin shad, Northern anchovy, or Siberian prawns.
+  3. Unidentifiable fish are placed into 10% formalin and returned to the CDFW Stockton lab for identification.
+  4. Certain species are retained for further studies. Specifically, Longfin Smelt and Wakasagi are retained in ethanol, Delta Smelt in liquid nitrogen, and clipped salmonids in ice. All other species are released after being counted and measured. Sex and sexual maturity data are collected only for Delta Smelt, unless there is a special request for Longfin Smelt or a misidentification occurs. 
+
+\vspace{-2truemm}
+**Delta Smelt:** The SKT focuses on the Delta Smelt and special considerations are given to the species. There are additional processing  done to obtain sex and maturity data (Table 5) of all caught Delta Smelt and to collect various other components of the fish, e.g., eggs from ripe females, for further studies. The logistics for this additional processing have evolved over time:
+
+```{r delta smelt processing logistic}
+read.csv(file.path("SKT", "deltaSmeltProcessing.csv")) %>% 
+  kbl(booktabs = T, longtable = T, linesep = "", caption = "The SKT Survey focuses on collecting data on Delta Smelt and employs additional processing for the species. Over time, these sampling protocols have been refined to incorporate lessons learned and to minimize impact to the species.") %>% 
+  kable_styling(latex_options = c("striped", "hold_position")) %>% 
+  column_spec(2, width = "40em")
+```
+
+Another consideration occurred in 2009 when a subsampling protocol was enacted to limit the number of Delta Smelt caught by the survey. Using historical SKT data, areas of high Delta Smelt catches are identified each year. In these areas, a 5-minute tow is conducted and up to 50 individuals are randomly selected to be measured, while the remaining are counted and released back into the wild. If there are less than 50 individuals caught, a second 5-minute tow is conducted and individual are counted and measured, but only up to 50 total individuals for the entire station. These subsampling events can be identified by their 5-minute tow durations, as compared to the normal 10-minute tows.
+
+**Flowmeter calibration:** General Oceananics flowmeters are used to estimate the volume of water sampled by each net. This calculation relies on a calibration factor specific to the flowmeter model that equates the rotor constant with the number of counts during the tow (eq. 1). Prior to 2015, the calibration factor each every flow meter was calibrated at UC Davis before the start of the season. Beginning in 2015, the calibration flume at UC Davis became inoperable, and the meters were sent to General Oceanics for refurbishing before each field season to justify using the factory calibration factor. Since 2019, meters are inspected at the end of every field season and are replaced with brand new units if refurbshing is required.
+
+## Lab analysis, fish ID and QC
+
+Fish caught by the SKT are generally adult fish and are easily identifiable; most samples are processed on board after each tow. Samples are only returned to the lab if the fish is unidentifiable or confirmation is required.
+  
+## Calculations
+
+**Relative density analysis:** 
+Catch per unit effort (CPUE) is provided as catch standardized to 10,000 $m^{3}$ using the following two equations:
+
+\begin{align}
+V_{t} = A * K * D_{t}
+\end{align}
+
+*Where:*
+
+$V_{t}$ = volume of water ($m^{3}$) filtered through the net per tow $t$
+
+$A$ = mouth opening of the net (13.9446 $m^{2}$)
+
+$K$ = calibration factor of the flow meter, 0.026873027 since 2015
+
+$D_{t}$ = difference in flow meter counts from start to finish of tow $t$
+
+\begin{align}
+n_{t} = F_{t}/V_{t} * 10000 m^{3}
+\end{align}
+
+*Where:*
+
+$n_{t}$ = number of fish per 10,000 $m^{3}$
+
+$F_{t}$ = fish caught per tow $t$
+
+$V_{t}$ = volume of water filtered through the net $m^{3}$ per tow $t$
+
+\begin{align}
+N_{t} = \frac{\sum n_t}{r_t}
+\end{align}
+
+*Where:*
+
+$N_{t}$ = number of fish per 10,000 $m^{3}$ per tow $t$
+
+$F_{t}$ = fish caught per tow $t$
+
+$V_{t}$ = volume of water filtered through the net $m^{3}$ per tow $t$
+
+**Delta Smelt Index of Relative Abundance:**
+
+\begin{align}
+I_y = \sum_{s = 1}^{4}\sum_{r = 1}^{3} N_{rs}
+\end{align}
+
+*Where:*
+
+$I$ = Delta Smelt Index of Relative Abundance of year $y$
+
+$s$ = survey, where 1 is the January Survey. Only the first four surveys (beginning in January) are used
+
+$r$ = region, the 39 SKT stations are defined across 3 regions (Table 6)
+
+$N$ = mean of CPUE (eq. 3) of Delta Smelt per region
+
+**Adjusted Count:**
+This metric is provided in the "sktJoined" table, which integrates the relational tables together, calculated as:
+
+\begin{align}
+F_{a,l} = T_{c}\bigg(\frac{F_{m,l}}{T_{m}}\bigg)
+\end{align}
+
+*Where:*
+
+$F_{a,l}$ = adjusted frequency of each recorded length $l$
+
+$T_{c}$ = total catch
+
+$F_{m,l}$ = measured frequency of each recorded length $l$
+
+$T_{m}$ = total number of fish measured
+
+## Data management
+
+  1. Application: Microsoft Office Access database
+  2. Datasheets: all hard copies are retained at the CDFW Stockton Office
+  3. Data entry protocols: field data is entered as soon as possible through a front-end application of the Access database by a dedicated Key Data Operator using forms 
+  4. QAQC protocols: after data is entered, each entered row is checked with data recorded on the datasheet, a process known as a line-by-line. There are two line-by-lines done by separate staff after the initial data entry. At the end of the season when all field data has been entered, two additional line-by-lines occurs. After this, a survey lead runs a series of coded queries to analyze the underlying data distribution of the environmental data to flag potential outliers (generally calculated as beyond two standard deviations of the mean). Not all flagged data are outliers. These queries simply serve to alert the project lead of potentially erroneous data and care is taken to edit only data that truly needs to be edited, e.g., data entered incorrectly or caused by equipment failure. All queries are coded in Access and R, with the R script published in the EDI publication. All resulting data edits of these outlying data points are documented in a separate log file.
+  5. Publication: 
+      + Location: data is published across three main locations: 1) CDFW Tier 3 server, 2) CDFW FTP website, and 3) EDI repository
+      + Frequency: per week for the CDFW Tier 3 server and per season for the CDFW FTP website and EDI repository. Due to the weekly frequency, data on the Tier 3 server includes more preliminary data than data on the FTP and EDI locations, and is meant to inform real-time management.
+
+## The provided data tables
+
+Tables "tblCatch", "tblFishInfo", "tblOrganismCodes", "tblSample", and "tblStationCoordiantes" are available “relational tables” from the SKT Access database. These tables are presented "as-is", exported directly from Access from R without any modifications. The “sktJoined” table is the integrated dataset that combines these relational tables together (Figure 2) with various manipulations to make the data as usable as possible. Users should be aware of the differences in units and column names of the recorded values between the relational and integrated tables (documented in the metadata section of the EDI publication page). All steps are coded in R and the relevant codes are provided in the EDI publication and/or housed on [trinhxuann/CDFW-IEP-Surveys Github page](https://github.com/trinhxuann/CDFW-IEP-Surveys).
+
+![The relational schema between the relational tables in the SKT database, used to produce the "sktJoined" table.](./skt/sktRelationalSchema.png){width=100%}
+
+## Station Metadata {#metadata}
+
+```{r, station metadata}
+SKT %>% 
+    group_by(StationCode) %>%
+    slice(1, n()) %>% 
+    select(SampleDate, StationCode) %>%
+    mutate(start = c("StartDate", "EndDate")) %>%
+    ungroup() %>%
+    tidyr::pivot_wider(names_from = "start", values_from = "SampleDate") %>%
+    # Going to just say that anything taken 30 days since the last date in the dataset == ongoing survey
+    mutate(EndDate = if_else(EndDate >= max(SKT$SampleDate) - 30, "Ongoing", as.character(EndDate)),
+           order = ifelse(EndDate %in% "Ongoing", 0, 1)) %>% 
+    arrange(order, as.numeric(StationCode), StartDate) %>% 
+    select(-order) %>% 
+    # Joining to mapDF to grab the type of station
+    left_join(select(mapDF, StationCode, Status), by = "StationCode") %>% 
+    kbl(booktabs = T, longtable = T, caption = paste0("List of stations sampled by SKT since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station, ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey. The non-core station(s) is/are not included in the SKT Delta Smelt Index of Relative Abundance due to being included after the inception of the survey, but are still regularly sampled.")) %>% 
+    kable_styling(latex_options = "striped")
+```
+
+## Project history
+
+The table below is a timeline of critical changes to the survey methods since its inception. The years listed below are water years, which begins three months before the new calendar year on October 1.
+
+```{r history table}
+df <- read.csv(file.path("SKT", "yearlyChangesSkt.csv"))
+
+pos <- df %>%
+  mutate(rowIndex = row_number(Year)) %>%
+  arrange(Year) %>%
+  group_by(Year) %>%
+  mutate(groupIndex = cur_group_id()) %>%
+  filter(groupIndex %% 2 == 1) %>%
+  pull(rowIndex)
+
+df %>%
+  kbl(booktabs = T, longtable = T, linesep = "", caption = "Historical protocol changes and deviations to the SKT Survey since its inception. Rows are highlighted per unique water year.") %>%
+  row_spec(pos, background = "#EEEEEE") %>%
+  column_spec(2, width = "40em")
+```
+
+\newpage
+## Appendix
+
+**Delta Smelt Gonadal Staging:**
+
+```{r gonadal}
+read.csv(file.path("SKT", "deltaSmeltGonadalStage.csv")) %>% 
+  kbl(booktabs = T, longtable = T, linesep = "", caption = "Characteristics of male and female Delta Smelt gonads used to stage sexual maturity of captured Delta Smelt.") %>% 
+  kable_styling(latex_options = c("striped", "hold_position")) %>% 
+  column_spec(c(3, 4), width = "18em")
+```
+
+**Delta Smelt Index of Relative Abundance Regional Groupings:**
+
+```{r regional groupings}
+read.csv(file.path("SKT", "sktIndexRegionalGroupings.csv")) %>% 
+  kbl(booktabs = T, longtable = T, caption = paste0("Regional groupings for the ", sum(mapDF$Status %in% "Core"), " core SKT stations used to calculate the Delta Smelt Index of Relative Abundance (eq.4).")) %>% 
+  kable_styling(latex_options = c("hold_position"))
+```
+
+**Species Sampled:** 
+
+```{r species sampled}
+SKT %>% 
+  group_by(OrganismCode, CommonName) %>% 
+  slice(1) %>% 
+  transmute(OrganismCode, CommonName, DateFirstID = SampleDate) %>% 
+  arrange(OrganismCode) %>% 
+  kbl(booktabs = T, longtable = T, caption = "The SKT Survey identifies all captured fish, jellyfish, and shrimp species. The date associated with the first identification of each species is provided. There is not been a species that is no longer identified by the survey if captured.") %>% 
+  kable_styling(latex_options = c("hold_position"))
+```

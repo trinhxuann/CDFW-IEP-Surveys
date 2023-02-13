@@ -1,0 +1,13 @@
+Sex,Stage,MicroCharacteristics,MacroCharacteristics
+Male,1,Proliferation of spermatogonia.,Left testis is barely visible and the right testis is impossible to find. Gonads < 0.1% of body weight.
+Male,2,Early recrudescence-spermatogonia and spermatocytes present.,Testis visible as thin strands ventrolateral to the swim bladder. Gonads are less than 0.5% of body weight.
+Male,3,Mid recrudescence- all stages of germ cells present.,Right testis is visible as a small pale white or grey cord. Left testis has developed in the central portion of the gonadal cord.
+Male,4,Late recrudescence- cysts filled with spermatozoa attached to sertoli cells.,"Both testes are clearly visible, smooth, and pale white."
+Male,5,"Functional maturity- lobules filled with ripe spermatozoa, very few spermatocutes and spermatids present.",Testes are bright white and very smooth. Testes account for 2-4% of body weight. Milt can be released by gentle pressure applied anterior to urogenital vent.
+Male,6,Post spawning- indicated by discharge of spermatozoa and presence of phagocytic cysts.,"Testes and milt not as bright white as during stage V. During summer months, can be indicated by decrease in size of testes."
+Female,1,Primordial follicles characterized by small oocytes with centrally located nucleus containing a single large nucleolus.,Left ovary translucent and grainy in texture. Right ovary difficult to impossible to find.
+Female,2,"Primary growth follicles with larger nuclei, basophilic oocytes cytoplasm, and multiple nucleoli located at the periphery of oocyte nucleus.",Looks the same as stage 1 when observed without a microscope.
+Female,3,"Primordial cortical alveoli stage, characterized by distinct clusters of enlarged oocytes, with PAS-positive cortical alveoli in the peripheral cytoplasm","Individual oocytes slightly orange, 0.25-0.50 mm in diameter, and visible to the naked eye."
+Female,4,Vitellogenic oocytes with cytoplasm containing yolk bodies and surrounded by two layered zona radiate.,Fertile and ripe females. Abdomen is enlarged with egg mass and observable without dissection. Oocytes are bright orange and about 1 mm in diameter. Eggs can be stripped with gentle pressure.
+Female,5,Postvitellogenic oocytes characterized by fusion of yolk bodies into homogenous yolk mass.,"Females that have not released their eggs for some reason. Oocytes are larger than 1mm in diameter, and hydrated. Clear fluid surrounds the orange oocytes that become increasingly cloudy and degenerate."
+Female,6,Postovulatory follicles with no oocytes and folded follicular layers,Females that have successfully spawned. Gonad is translucent and textured with a few leftover oocytes embedded in tissue. Loose abdomen easily detected.
