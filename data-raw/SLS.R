@@ -72,7 +72,7 @@ downloadSLS <- function(url = "https://filelib.wildlife.ca.gov/Public/Delta%20Sm
 }
 
 # Function to connect to the Access database
-connectAccess <- function(file = Args[2],
+connectAccess <- function(file = Args[1],
                           exdir = tempdir(),
                           surveyName = "SLS") {
   
@@ -112,12 +112,12 @@ connectAccess <- function(file = Args[2],
 }
 
 # Function to start reading data from Access directly
-readSLSAccess <- function(file = Args[2],
+readSLSAccess <- function(file = Args[1],
                           exdir = tempdir(),
                           surveyName = "SLS",
                           returnDF = F,
-                          tablesReturned = Args[-(1:2)]) {
-  pb <- txtProgressBar(min = 0, max = 5, style = 3)
+                          tablesReturned = Args[-(1)]) {
+  pb <- txtProgressBar(min = 0, max = 4, style = 3)
   startTime <- Sys.time()
   cat("\nConnecting to Access \n")
   
@@ -165,15 +165,15 @@ readSLSAccess <- function(file = Args[2],
     # The catch table is fine, just needs the manipulation to Date
     mutate(Date = as.Date(Date))
   
-  # Fish code table
-  fishCodePosition <- which(sapply(SLSTables, 
-                                  function(tables) any(grepl("Common.Name", 
-                                                             x = names(tables), 
-                                                             ignore.case = T))))
-  
-  SLSTables[[fishCodePosition]] <- SLSTables[[fishCodePosition]] %>% 
-    transmute(CommonName = Common.Name,
-              FishCode = Fish.Code)
+  # # Fish code table
+  # fishCodePosition <- which(sapply(SLSTables, 
+  #                                 function(tables) any(grepl("Common.Name", 
+  #                                                            x = names(tables), 
+  #                                                            ignore.case = T))))
+  # 
+  # SLSTables[[fishCodePosition]] <- SLSTables[[fishCodePosition]] %>% 
+  #   transmute(CommonName = Common.Name,
+  #             FishCode = Fish.Code)
  
    # Length table
   lengthPosition <- which(sapply(SLSTables, 
@@ -219,8 +219,8 @@ readSLSAccess <- function(file = Args[2],
   SLSTables[[waterPosition]] <- SLSTables[[waterPosition]] %>% 
     transmute(Survey, 
               Date = as.Date(Date),
-              Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
-           Lat, Long, Comments)
+              Station, TopTemp, TopEC, BottomEC, Secchi, FNU,
+           StartLat, StartLong, Comments)
   
   # Meter Correction
   # Columns names are ok; only need to change calibrationDate to as.Date
@@ -252,44 +252,6 @@ readSLSAccess <- function(file = Args[2],
   setTxtProgressBar(pb, 2)
   pullTime <- Sys.time()
   
-  # Round all numeric values to 7 digits...This gets rid of "ghost numbers", as known by Bay Study,
-  # that are caused by the use of "single" field size in Access. When converted to "double"
-  # in R and Excel, the addition of additional decimal points causes non-zero digits to appear
-  # to fill in the missing spaces. This is simply a limitation of computer arithmetics
-  substrRight <- function(x, n) {
-    substr(x, nchar(x) - n + 1, nchar(x))
-    # Function sourced from: https://stackoverflow.com/questions/7963898/extracting-the-last-n-characters-from-a-string-in-r?rq=1
-  }
-  
-  cat("\nChecking for float issues.", fill = T)
-  
-  floatIssue <- lapply(SLSTables, function(x) {
-    df <- x %>% 
-      summarise(across(where(is.numeric), 
-                       # Will check for 14 digits, since conversion of "single" to double
-                       ~suppressWarnings(sum(as.numeric(substrRight(sprintf("%.14f", .x), 1)), na.rm = T)))) %>% 
-      select_if(~ !is.numeric(.) || sum(.) != 0) %>% 
-      names()
-  })
-  
-  # Which data frames have this float issue:
-  floatIssueDF <- names(which(sapply(floatIssue, function(x) !identical(x, character(0)))))
-  # Within the affected DFs, round the affected columns to 7 and then 2 digits
-  # I believe the step to round to 7 digits is not needed but does not really affect computational speed
-  # Will leave because mechanically, "single" field size is 7 digits long.
-  for (i in floatIssueDF) {
-    
-    columnsAffected <- floatIssue[[i]]
-    
-    cat("Column(s)", paste(columnsAffected, collapse = ", "), "in the", i, "data table experienced float issues. Rounding accordingly.", fill = T)
-    
-    SLSTables[[i]] <- SLSTables[[i]] %>% 
-      mutate(across(all_of(columnsAffected), ~round(.x, 7)),
-             across(all_of(columnsAffected), ~round(.x, 2)))
-  }
-  
-  setTxtProgressBar(pb, 3)
-  floatTime <- Sys.time()
   # For instances where you do not want to write the rds and want to work 
   # entirely in this environment, returnDF will be used
   
@@ -326,7 +288,7 @@ readSLSAccess <- function(file = Args[2],
       file.exists(filePath)
     })
     
-    setTxtProgressBar(pb, 4)
+    setTxtProgressBar(pb, 3)
     writeTime <- Sys.time()
     
     if (!all(writeFiles)) {
@@ -346,7 +308,7 @@ readSLSAccess <- function(file = Args[2],
     saveRDS(SLSTables, file = file.path("data-raw", surveyName, "SLSTables.rds"),
             compress = T, ascii = T)
     
-    setTxtProgressBar(pb, 5)
+    setTxtProgressBar(pb, 4)
     saveTime <- Sys.time()
     
     if (file.exists(file.path("data-raw", surveyName, "SLSTables.rds"))) cat("\nRDS file created successfully  \n")
@@ -358,12 +320,11 @@ readSLSAccess <- function(file = Args[2],
   
   cat(paste0("Connection time: ", round(as.numeric(connectionTime - startTime, units = "secs"), 1), 
              "; pull time: ", round(as.numeric(pullTime - connectionTime, units = "secs"), 1),
-             "; float time: ", round(as.numeric(floatTime - pullTime, units = "secs"), 1),
-             "; write time: ", round(as.numeric(writeTime - floatTime, units = "secs"), 1),
+             "; write time: ", round(as.numeric(writeTime - pullTime, units = "secs"), 1),
              "; save time: ", round(as.numeric(saveTime - writeTime, units = "secs"), 1),
              "; overall time: ", round(as.numeric(endTime - startTime, units = "secs"), 1), " seconds."), fill = T)
 }
 
 # Run the functions to download and read the database
-downloadSLS()
+# downloadSLS()
 readSLSAccess()

@@ -119,7 +119,7 @@ pullCDEC <- function(station, sensor = NULL,
   }
   
   # Need to convert temperature data into C.
-  if (unique(df$units) %in% "DEG F") {
+  if (unique(df$units) %in% "DEG F" & mean(df$value, na.rm = T) > 32) {
     df <- dplyr::mutate(df, 
                         value = (value - 32)*5/9,
                         units = "DEG C")
@@ -138,14 +138,42 @@ pullMetadataCDEC <- function(station, list = T) {
 }
 
 popCDEC <- function(df, 
+                    dfTime = NULL,
                     cdec,
                     metadata,
                     variable = c("temp", "turbidity", "ec"), 
                     waterColumn = c("top", "lower")) {
-  
+
   if (nrow(df) == 0) {
     message("Data frame has no data.")
     return(data.frame())
+  }
+  
+  # Are there dates and time variables in the DF?
+  dateVariable <- names(df)[which(sapply(df, function(x) inherits(x, "Date")))]
+  timeVariable <- names(df)[which(sapply(df, function(x) inherits(x, "POSIXct")) & !names(df) %in% "dateTime")]
+  
+  if (length(dateVariable) > 0) {
+    dateVariable <- sym(dateVariable)
+  } else {
+    stop("A date variable (Date format) is missing.", call. = F)
+  }
+  
+  if (length(timeVariable) > 0) {
+    timeVariable <- sym(timeVariable)
+  } else {
+    if (is.null(dfTime)) {
+      stop("A time variable (POSIXct format) is missing. Specify `dfTime` or join time to your data frame.", call. = F)
+    }
+    
+    # Join dfTime to grab the time variable
+    df <- df %>% 
+      left_join(dfTime %>% 
+                  select(!!dateVariable, Station, Tow, where(is.POSIXct)), 
+                by = c(as.character(dateVariable), "Station")) %>% 
+      mutate(Time = as.POSIXct(paste(Date, format(Time, format = "%H:%M:%S"))))
+    
+    timeVariable <- sym(names(df)[which(sapply(df, function(x) inherits(x, "POSIXct")) & !names(df) %in% "dateTime")])
   }
   
   variableWanted <- ifelse(variable %in% "ec", "ELEC.* CONDUCT.* MICRO", variable)
@@ -156,50 +184,59 @@ popCDEC <- function(df,
     pivot_longer(c(first, second, third), 
                  names_to = "priority", values_to = "cdecGage")
   
-  filteredMetadata <- lapply(na.omit(unique(joinedDF$cdecGage)), function(x) {
-    
-    dfFiltered <- metadata[[x]] %>%
-      filter(grepl(variableWanted, sensorDescription, ignore.case = T))
-    
-    if (nrow(dfFiltered) > 1) {
-      if (waterColumnWanted == "lower") {
-        dfFilteredWaterColumn <- dfFiltered %>%
-          filter(grepl(waterColumnWanted, sensorDescription, ignore.case = T))
-        if (nrow(dfFilteredWaterColumn) != 0) {
-          dfFiltered <- dfFilteredWaterColumn
-        }
-      } else {
-        dfFilteredWaterColumn <- dfFiltered %>%
-          filter(!grepl("lower", sensorDescription, ignore.case = T))
-        if (nrow(dfFilteredWaterColumn) != 0) {
-          dfFiltered <- dfFilteredWaterColumn
+  gagesOfInterest <- na.omit(unique(joinedDF$cdecGage))
+  
+  if (length(gagesOfInterest) > 0) {
+   
+    filteredMetadata <- lapply(na.omit(unique(joinedDF$cdecGage)), function(x) {
+      
+      dfFiltered <- metadata[[x]] %>%
+        filter(grepl(variableWanted, sensorDescription, ignore.case = T))
+      
+      if (nrow(dfFiltered) > 1) {
+        if (waterColumnWanted == "lower") {
+          dfFilteredWaterColumn <- dfFiltered %>%
+            filter(grepl(waterColumnWanted, sensorDescription, ignore.case = T))
+          if (nrow(dfFilteredWaterColumn) != 0) {
+            dfFiltered <- dfFilteredWaterColumn
+          }
+        } else {
+          dfFilteredWaterColumn <- dfFiltered %>%
+            filter(!grepl("lower", sensorDescription, ignore.case = T))
+          if (nrow(dfFilteredWaterColumn) != 0) {
+            dfFiltered <- dfFilteredWaterColumn
+          }
         }
       }
-    }
-    
-    duration <- pull(dfFiltered, duration) %>%
-      factor(levels = c("event", "hourly", "daily")) %>%
-      sort()
-    
-    if (length(duration) == 0) {
-      message("Sensor ", dQuote(x), " does not have sensor data for ", dQuote(variable), ".")
-      return()
-    }
-    
-    duration <- duration[[1]]
-    
-    dfFiltered %>%
-      filter(duration == !!duration) %>%
-      transmute(cdecGage = gage,
-                SensorNumber = sensorNumber,
-                Duration = duration)
-  }) %>% 
-    bind_rows() %>% 
-    right_join(joinedDF, by = "cdecGage") %>% 
-    relocate(c(cdecGage, SensorNumber, Duration), .after = everything()) %>% 
-    arrange(TowTime, priority) %>%
-    mutate(cdecGage = ifelse(is.na(SensorNumber) | is.na(Duration),
-                             NA, cdecGage))
+      
+      duration <- pull(dfFiltered, duration) %>%
+        factor(levels = c("event", "hourly", "daily")) %>%
+        sort()
+      
+      if (length(duration) == 0) {
+        message("Sensor ", dQuote(x), " does not have sensor data for ", dQuote(variable), ".")
+        return()
+      }
+      
+      duration <- duration[[1]]
+      
+      dfFiltered %>%
+        filter(duration == !!duration, !grepl("AIR", sensorDescription)) %>%
+        transmute(cdecGage = gage,
+                  SensorNumber = sensorNumber,
+                  Duration = duration)
+    }) %>% 
+      bind_rows() %>% 
+      right_join(joinedDF, by = "cdecGage") %>% 
+      relocate(c(cdecGage, SensorNumber, Duration), .after = everything()) %>% 
+      arrange(!!timeVariable, priority) %>%
+      mutate(cdecGage = ifelse(is.na(SensorNumber) | is.na(Duration),
+                               NA, cdecGage))
+  } else {
+    return(df %>% 
+             mutate(valueCDEC = "No applicable CDEC stations.") %>% 
+             relocate(contains("valueCDEC"), .before = contains("mean")))
+  }
   
   joinedDFCDEC <- filteredMetadata %>% 
     filter(!is.na(cdecGage)) %>% 
@@ -209,9 +246,9 @@ popCDEC <- function(df,
     mutate(group = paste(SensorNumber, Duration, sep = "_")) %>% 
     group_by(group) %>% 
     split(f = .$group)
-  
+
   pulledData <- lapply(splitGroups, function(x) {
-    
+
     dates <- pull(x, which(sapply(x, function(x) inherits(x, "Date"))))
     
     cdecStations <- unique(x$cdecGage)
@@ -221,15 +258,14 @@ popCDEC <- function(df,
                    duration = unique(x$Duration), 
                    dateStart = min(dates), 
                    dateEnd = max(dates) + 1) %>% 
-      right_join(x, by = c("obsDate" = "SampleDate", "stationId" = "cdecGage"))
+      right_join(x, by = c("obsDate" = as.character(dateVariable), "stationId" = "cdecGage"), 
+                 relationship = "many-to-many")
     
     if (is.null(df)) return(data.frame(valueCDEC = NA,
                                        closestTime = NA))
     
-    towTimeIndex <- sym(names(df)[which(sapply(df, function(x) inherits(x, "POSIXct")) & !names(df) %in% "dateTime")])
-    
     df <- df %>% 
-      mutate(closestTime = abs(difftime(!!towTimeIndex, dateTime, units = "mins"))) %>% 
+      mutate(closestTime = abs(difftime(!!timeVariable, dateTime, units = "mins"))) %>% 
       group_by(rowNumber) %>% 
       slice(which.min(closestTime)) %>% 
       transmute(stationId,
@@ -253,7 +289,7 @@ popCDEC <- function(df,
                 filter(is.na(cdecGage))) %>% 
     pivot_wider(names_from = "priority", 
                 values_from = c("cdecGage", "SensorNumber", "Duration", "valueCDEC", "closestTime")) %>% 
-    relocate(contains("valueCDEC"), .before = Mean)
+    relocate(contains("valueCDEC"), .before = contains("mean"))
 }
 
 parPopCDEC <- function(df, 

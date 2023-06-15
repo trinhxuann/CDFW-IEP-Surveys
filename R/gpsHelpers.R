@@ -35,7 +35,7 @@ plotGPS <- function(df, year = NULL, survey = NULL, station = NULL, ...) {
     purrr::walk( function(df) {
       l <<- l %>%
         addCircleMarkers(data = dfSplit[[df]],
-                         ~Long, ~Lat,
+                         ~StartLong, ~StartLat,
                          label = ~as.character(Station),
                          color = ~pal(group),
                          group = df,

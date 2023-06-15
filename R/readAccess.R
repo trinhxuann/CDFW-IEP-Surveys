@@ -56,7 +56,6 @@ pullAccessDF <- function(script = c("SLS.R", "20mm", "SKT"),
       # a new terminal of R, so specific formats must be followed here. Currently, this is set up as
       # user friendly as possible via arguments in this function.
       terminalOutput <- system(paste0(Sys.getenv("R_HOME"), "/bin/i386/Rscript.exe ", filePath,
-                                      " ", bypass, 
                                       " ", file,
                                       " ", tablesReturned), 
                                wait = T)
@@ -80,10 +79,11 @@ pullAccessDF <- function(script = c("SLS.R", "20mm", "SKT"),
 
 # UDrive route
 pullAccessDF(script = "SLS.R",
-             bypass = T,
-             file = "C:\\Users\\txnguyen\\Desktop\\SLS_Query.accdb",
+             file = "U:\\NativeFish\\SmeltData\\DS-DATA\\SLS_Query.accdb",
              tablesReturned = c("Catch", "Lengths", "MeterCorrections",
                                 "TowInfo", "WaterInfo", "Station_Lookup"))
+
+
 
 # # For 20mm
 # # 20mmStations == StationCords

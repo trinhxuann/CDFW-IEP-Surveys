@@ -5,11 +5,14 @@
 # libraries ---------------------------------------------------------------
 
 library(dplyr)
+library(readr)
 library(tidyr)
 library(lubridate)
 library(stringr)
 library(leaflet)
 library(geosphere)
+library(httr)
+library(rvest)
 
 # Reading in the base tables ----------------------------------------------
 # This script should be ran after creating the databases script. I will assume
@@ -42,6 +45,8 @@ if (!all(names(data) %in% expectedNames)) {
           " do/does not have the defaults.")
 }
 
+# Load the helper functions
+source("R/gpsHelpers.R")
 
 # Now moving on to checking outliers 
 # The calculations below are those that were requested by Adam on 11-9-2021
@@ -60,35 +65,36 @@ if (!all(names(data) %in% expectedNames)) {
 
 GPSDF <- data$WaterInfo %>% 
   # Converting the GPS coordinates from H/M/S to degrees
-  mutate(# Across here is a function that applies a function ACROSS the specified columns (Lat, Long here)
+  mutate(# Across here is a function that applies a function ACROSS the specified columns (StartLat, StartLong here)
          # To these columns, remove "." and "-"
-         across(c(Lat, Long), ~str_remove(.x, "\\.") %>% str_remove_all("\\-")),
-         # str_sub to pull digits from the Lat column based on their character index
-         LatD = str_sub(Lat, start = 1, end = 2),
-         LatM = str_sub(Lat, start = 3, end = 4),
+         across(c(StartLat, StartLong), ~str_remove(.x, "\\.") %>% str_remove_all("\\-")),
+         # str_sub to pull digits from the StartLat column based on their character index
+         StartLatD = str_sub(StartLat, start = 1, end = 2),
+         StartLatM = str_sub(StartLat, start = 3, end = 4),
          # Very specific pattern in in sub and involves knowledge of "regex"
-         # Essentially, in Lat, pull data from position 5 on, find the first 2 digits
+         # Essentially, in StartLat, pull data from position 5 on, find the first 2 digits
          # replace that with the first two digits you just matched (\\1), a period (.), and the rest
          # of the match (\\2)
-         LatS = sub("(.{2})(.*)", "\\1.\\2", str_sub(Lat, start = 5)),
-         LonD = str_sub(Long, start = 1, end = 3),
-         LonM = str_sub(Long, start = 4, end = 5),
-         LonS = sub("(.{2})(.*)", "\\1.\\2", str_sub(Long, start = 6)),
-         # Converting Lat/Long to numeric
-         across(c(LatD, LatM, LatS, LonD, LonM, LonS), ~as.numeric(.x)),
-         # Now finally converting to lat/long in 
-         Lat = LatD + LatM/60 + LatS/3600,
-         Long = -(LonD + LonM/60 + LonS/3600),
+         StartLatS = sub("(.{2})(.*)", "\\1.\\2", str_sub(StartLat, start = 5)),
+         StartLonD = str_sub(StartLong, start = 1, end = 3),
+         StartLonM = str_sub(StartLong, start = 4, end = 5),
+         StartLonS = sub("(.{2})(.*)", "\\1.\\2", str_sub(StartLong, start = 6)),
+         # Converting StartLat/StartLong to numeric
+         across(c(StartLatD, StartLatM, StartLatS, StartLonD, StartLonM, StartLonS), ~as.numeric(.x)),
+         # Now finally converting to StartLat/StartLong in 
+         StartLat = StartLatD + StartLatM/60 + StartLatS/3600,
+         StartLong = -(StartLonD + StartLonM/60 + StartLonS/3600),
          # Creating season year to help with the plotting function below
-         SeasonYear = year(Date) + (month(Date) > 11),
+         Year = year(Date) + (month(Date) > 11),
          # This group column is to differentiate between the coordinates recorded on the actual tows
          # vs the theoretical below
          group = "Tow") %>% 
-  # Now binding to lon/lat of the 20 mm stations; these will serve as the "average"
+  rename(Comments.Station = Comments) %>% 
+  # Now binding to lon/StartLat of the 20 mm stations; these will serve as the "average"
   # coordinates that these stations potentially should be at and will serve as a visual
   # comparison to where the tow coordinates are
   bind_rows(data$Station_Lookup %>% 
-              mutate(# Current structure of the lat/long is each component separated by spaces: pull that out
+              mutate(# Current structure of the StartLat/StartLong is each component separated by spaces: pull that out
                      LatD = sapply(strsplit(.$Lat, "\\s"), "[", 1),
                      LatM = sapply(strsplit(.$Lat, "\\s"), "[", 2),
                      LatS = sapply(strsplit(.$Lat, "\\s"), "[", 3),
@@ -97,184 +103,69 @@ GPSDF <- data$WaterInfo %>%
                      LonS = sapply(strsplit(.$Long, "\\s"), "[", 3),
                      across(c(LatD, LatM, LatS, LonD, LonM, LonS), as.numeric)) %>% 
               transmute(Station,
-                        Lat = LatD + LatM/60 + LatS/3600,
-                        Long = -(LonD + LonM/60 + LonS/3600),
+                        # Not truly the theoretical start and ending coordinates but more so the
+                        # center coordinates.
+                        StartLat = LatD + LatM/60 + LatS/3600,
+                        StartLong = -(LonD + LonM/60 + LonS/3600),
                         group = "TheoreticalCoords"))
 
 # This step will be in two parts, using two main functions: plotGPS and findOutlierGPS below:
+# The plotGPS() function is housed in the gpsHelper script that is read in above
+# There are several arguments to this function:
+# year, survey, station
+# You can also filter beforehand and not specify any filter arguments
+plotGPS(GPSDF, year = yearOfInterest)
 
-# Use plotGPS to visually determine where outliers may be
-plotGPS <- function(df, station = NULL, Year = NULL, ...) {
+gpsOutlier <- function(df, d = 0.5, station = NULL, year = NULL, survey = NULL,
+                       returnDF = F) {
   
-  pal <- colorFactor("viridis", domain = c(df$group))
+  if (!is.null(survey)) df <- filter(df, Survey %in% survey | group %in% "TheoreticalCoords")
   
-  # Are there a year and station filter? Both?
-  if (is.null(Year)) {
-    warning("This will plot all tows in the requested data table and may take a substantial amount of resources to complete.", call. = F)
-  } else {
-    df <- df %>% 
-      filter(SeasonYear == Year | group == "TheoreticalCoords" | is.numeric(group))
-  }
-  
-  if (!is.null(station)) {
-    df <- df %>% 
-      filter(Station == station)
-  }
-  
-  leaflet(df,
-          width = "100%",
-          height = "500") %>%
-    addProviderTiles(providers$CartoDB.Positron) %>%
-    addCircleMarkers(~Long, ~Lat,
-                     label = ~as.character(Station),
-                     color = ~pal(group),
-                     radius = 4,
-                     stroke = F, fillOpacity = 0.8,
-                     labelOptions = labelOptions(noHide = T,
-                                                 offset = c(18,0),
-                                                 textOnly = T,
-                                                 textsize = "12px",
-                                                 direction = "center")) %>% 
-    addLegend(pal = pal, values = ~group, opacity = 1, ...)
-}
-
-# Example: this plots ALL stations across a year of interest; Year can be left blank if
-# you want all stations across all years plotted (will be slow though)
-plotGPS(GPSDF, Year = 2022, title = "Source")
-plotGPS(GPSDF, Year = 2022, station = 809, title = "Source")
-
-# Use findOutlierGPS after running plotGPS and visually determining which stations/year may have 
-
-# Finding the spatial distance between the points to run the clustering analysis on
-# Function taken from https://stackoverflow.com/questions/21095643/approaches-for-spatial-geodesic-latitude-longitude-clustering-in-r-with-geodesic
-geo.dist = function(df) {
-  require(geosphere)
-  d <- function(i, z){         # z[1:2] contain long, lat columns
-    dist <- rep(0, nrow(z))    # Creates placeholder to begin populating array
-    dist[i:nrow(z)] <- distVincentyEllipsoid(z[i:nrow(z), 1:2], z[i, 1:2]) # Calculates distances between each points
-    return(dist)
-  }
-  dm <- do.call(cbind, lapply(1:nrow(df), d, df)) # Building the array of distances between each points
-  return(as.dist(dm))
-}
-
-# Function to analyze for outliers based on spatial distances and hierarchical clustering;
-# if k (the # of clusters you want) is specified, will also plot the clusters 
-findOutlierGPS <- function(df, station = NULL, Year = NULL, 
-                           k = NULL, plot = T) {
+  if (!is.null(year)) df <- filter(df, Year %in% year | group %in% "TheoreticalCoords")
   
   if (!is.null(station)) df <- filter(df, Station %in% station)
   
-  # need the TheoreticalCoords filter because those do not have a year associated with them; ok to do it here
-  # since the station filter goes first. When year is specified and no station, will display all theoretical stations
-  # the is numeric group is for AFTER cluster have been chosen, so for dfClust df in the findOutlierGPS() function
-  if (!is.null(Year)) df <- filter(df, SeasonYear %in% Year | group %in% "TheoreticalCoords")
+  theoretical <- df %>% 
+    filter(group %in% "TheoreticalCoords")
   
-  d <- geo.dist(select(df, Long, Lat))
-  hc <- hclust(d)
+  outlierDF <- lapply(unique(df$Station), function(x) {
+    tows <- df %>% 
+      filter(group %in% "Tow", Station == x)
+    
+    theoretical <- df %>% 
+      filter(group %in% "TheoreticalCoords", Station == x)
+    
+    if (nrow(theoretical) > 0 & nrow(tows) > 0) {
+     
+      df <- tows %>% 
+        mutate(longTheoretical = theoretical$StartLong,
+               latTheoretical = theoretical$StartLat,
+               distance = distVincentyEllipsoid(cbind(StartLong, StartLat),
+                                                cbind(longTheoretical, latTheoretical))/1609.34,
+               outlier = ifelse(distance > d, T, F),
+               NAflag = ifelse((is.na(StartLat) | is.na(StartLong)), T, F)) %>% 
+        filter(outlier == T | NAflag == T)
+    } else df <- NULL
+    
+    df
+  }) %>% 
+    bind_rows()
   
-  # There has to be more than two clusters to plot
-  if (plot & length(hc$order) > 2) plot(hc)
+  fin <- outlierDF %>% 
+    bind_rows(df %>% 
+                filter(group %in% "TheoreticalCoords",
+                       Station %in% unique(outlierDF$Station)))
   
-  if (!is.null(k)) {
-    # cutree is what cuts the data up into the number of clusters you want
-    clusters <- cutree(hc, k)
-    
-    # Specifying the cluster
-    dfClust <- df %>% 
-      filter(!is.na(Long), !is.na(Lat)) %>% 
-      # A bit of coding to get the theoretical coords to always be cluster 1
-      # First, convert group into a factor with levels to arrange correctly
-      # Second, create groupOrder as a factor and pull the numeric version of it to assign as clusters
-      # ***"group" is essential here as it is used by the plotGPS() funciton below for the legend
-      # This should be the clusters
-      mutate(source = factor(group, levels = c("TheoreticalCoords", "Tow")),
-             Cluster = clusters,
-             group = Cluster) %>% 
-      arrange(source) %>% 
-      # mutate(groupOrder = factor(groupOrder, levels = unique(.$groupOrder)),
-      #        group = as.numeric(groupOrder)) %>%
-      # group_by(group) %>%
-      # add_tally() %>%
-      ungroup()
-    
-    # Making the assumption here that if it is NOT in the same group as the theoretical coordinates,
-    # then it is outlying
-    # Find what "group" is the theoretical cluster; should generally be 1
-    theoreticalCluster <- dfClust %>% 
-      filter(is.na(Date), is.na(Temp), is.na(LonD)) %>% 
-      pull(Cluster)
-    
-    dfClust <- dfClust %>% 
-      # Removing this for now; to have an outlier column, need a "criteria" to make them outliers
-      # Need to work through the thinking of this. For now, this will simply return the clusters
-      # for the ES to manually evaluate.
-      # One thought I have is to use historical "corrected" GPS coordinates and develop a perimeter 
-      # around the theoretical that would mark stations as outliers or not. Need to make sure that we
-      # have no outliers in our datasets before this feature comes online.
-      mutate(Outlier = ifelse(Cluster == theoreticalCluster, F, T))
- 
-    if (plot) print(plotGPS(dfClust, station = station, Year = Year, title = "Cluster"))
-   
-    dfClust %>% 
-      select(Date, SeasonYear, Survey, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
-             Lat, Long, Comments, source, Cluster, Outlier) %>%   
-      arrange(-Outlier)
-  } else {
-    cat("Pick a the number of clusters, k using the map displayed. \n")
-    plotGPS(df, station = station, Year = Year, title = "Source")
-  }
+  if (isTRUE(returnDF)) {
+    fin %>% 
+      transmute(Date, Year, Survey, Station, 
+                Comments.Station,
+                group, StartLat, StartLong, longTheoretical, latTheoretical,
+                distance, outlier, NAflag)
+  } else plotGPS(df = fin)
 }
 
-# Edit – GPS Coordinates
-# These are stations that I see that may be outlying across ALL years; 
-# IMPORTANT:
-# k was chosen after visual inspection of the produced dendogram
-# print = F used AFTER confirming with the visualizations that this is what you want
-
-GPSOutlying <- list()
-# GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022)
-GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 809, Year = 2022, k = 3)
-GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 910, Year = 2022, k = 2)
-GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 919, Year = 2022, k = 2)
-GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 914, Year = 2022, k = 2, plot = F)
-
-# Might be useful to plot all years data for the particular station of interest?
-
-# findOutlierGPS(GPSDF, station = 610)
-# findOutlierGPS(GPSDF, station = 610, k = 4)
-# 
-# GPSOutlying[[1]] <- findOutlierGPS(GPSDF, station = 912, k = 2, plot = F)
-# GPSOutlying[[2]] <- findOutlierGPS(GPSDF, station = 609, k = 2, plot = F)
-# GPSOutlying[[3]] <- findOutlierGPS(GPSDF, station = 606, k = 2, plot = F)
-# GPSOutlying[[4]] <- findOutlierGPS(GPSDF, station = 610, k = 5, plot = F)
-# GPSOutlying[[5]] <- findOutlierGPS(GPSDF, station = 520, k = 2, plot = F)
-# GPSOutlying[[6]] <- findOutlierGPS(GPSDF, station = 915, k = 3, plot = F)
-# # Maybe 1 station outlying in season year 2021
-# GPSOutlying[[7]] <- findOutlierGPS(GPSDF, station = 815, Year = 2021, k = 2, plot = F)
-
-# For multiple stations, can bind these together into a singular data frame
-# Would envision all clusters other than 1 would be classified as outliers, something like:
-outliers$GPSCoordinates <- lapply(GPSOutlying, function(x) filter(x, Outlier == T)) %>% 
-  bind_rows() %>% 
-  # Bind to this outlying DF also entries that do NOT have a recorded Lat/Long
-  bind_rows(data$WaterInfo %>% 
-              # This gives a warning of NAs introduced by coercion; can ignore given that these are NAs to start with
-              # Will simply supress this because it is not a valid warning
-              select(Date, Survey, Station, Temp, TopEC, BottomEC, Secchi, Turbidity,
-                     Lat, Long, Comments) %>% 
-              filter(is.na(Lat) | is.na(Long)) %>% 
-              mutate(across(c(Lat, Long), ~suppressWarnings(as.numeric(.x))),
-                     NAFlag = T,
-                     Outlier = F)) %>% 
-  mutate(NAFlag = ifelse(is.na(NAFlag), F, NAFlag),
-         SeasonYear = ifelse(is.na(SeasonYear), year(Date) + (month(Date) > 11), SeasonYear)) %>% 
-  arrange(-Outlier, Date, Station)
-# Note, this does NOT have a SeasonYear %in% yearOfInterest filter; this step should of been taken care of
-# when manually surveying which station is outlying
-
-# Moving forward, there may be a need to add additional filters to the data rows that are NAFlags
-# A season year filter can easily be added here after the initial QAQC of these rows are done
+outliers$GPS <- gpsOutlier(GPSDF, d = 0.5, year = yearOfInterest, returnDF = T)
 
 # Cable outliers ----------------------------------------------------------
 
@@ -458,16 +349,16 @@ outliers$Temp <- data$WaterInfo %>%
   group_by(Station) %>% 
   mutate(SeasonYear = year(Date) + (month(Date) > 11),
          # This is part 1 of the query
-         meanTemp = mean(Temp, na.rm = T),
-         sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-         sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
+         meanTemp = mean(TopTemp, na.rm = T),
+         sd2down = meanTemp - 2 * sd(TopTemp, na.rm = T),
+         sd2up = meanTemp + 2 * sd(TopTemp, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
-         NAFlag = ifelse(is.na(Temp), T, F)) %>% 
+         Outlier = ifelse((TopTemp < sd2down | TopTemp > sd2up), T, F),
+         NAFlag = ifelse(is.na(TopTemp), T, F)) %>% 
   ungroup() %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, SeasonYear, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, TopTemp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
   filter(Outlier == T | NAFlag == T,
          SeasonYear %in% yearOfInterest) %>% 
@@ -478,16 +369,16 @@ outliers$TempMonth <- data$WaterInfo %>%
   group_by(Station, Month = month(Date)) %>% 
   mutate(SeasonYear = year(Date) + (month(Date) > 11),
          # This is part 1 of the query
-         meanTemp = mean(Temp, na.rm = T),
-         sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-         sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
+         meanTemp = mean(TopTemp, na.rm = T),
+         sd2down = meanTemp - 2 * sd(TopTemp, na.rm = T),
+         sd2up = meanTemp + 2 * sd(TopTemp, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
-         NAFlag = ifelse(is.na(Temp), T, F)) %>% 
+         Outlier = ifelse((TopTemp < sd2down | TopTemp > sd2up), T, F),
+         NAFlag = ifelse(is.na(TopTemp), T, F)) %>% 
   ungroup() %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, SeasonYear, Month, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, TopTemp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
   filter(Outlier == T | NAFlag == T,
          SeasonYear %in% yearOfInterest) %>% 
@@ -620,16 +511,16 @@ outliers$Turbidity <- data$WaterInfo %>%
   group_by(Station) %>% 
   mutate(SeasonYear = year(Date) + (month(Date) > 11),
          # This is part 1 of the query
-         meanTurbidity = mean(Turbidity, na.rm = T),
-         sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
-         sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
+         meanTurbidity = mean(FNU, na.rm = T),
+         sd2down = meanTurbidity - 2 * sd(FNU, na.rm = T),
+         sd2up = meanTurbidity + 2 * sd(FNU, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up), T, F),
-         NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
+         Outlier = ifelse((FNU < sd2down | FNU > sd2up), T, F),
+         NAFlag = ifelse(is.na(FNU), T, F)) %>% 
   ungroup() %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, SeasonYear, Station, Turbidity, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Station, FNU, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
   filter(Outlier == T | NAFlag == T,
          SeasonYear %in% yearOfInterest) %>% 
@@ -640,337 +531,62 @@ outliers$TurbidityMonth <- data$WaterInfo %>%
   group_by(Station, Month = month(Date)) %>% 
   mutate(SeasonYear = year(Date) + (month(Date) > 11),
          # This is part 1 of the query
-         meanTurbidity = mean(Turbidity, na.rm = T),
-         sd2down = meanTurbidity - 2 * sd(Turbidity, na.rm = T),
-         sd2up = meanTurbidity + 2 * sd(Turbidity, na.rm = T),
+         meanTurbidity = mean(FNU, na.rm = T),
+         sd2down = meanTurbidity - 2 * sd(FNU, na.rm = T),
+         sd2up = meanTurbidity + 2 * sd(FNU, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((Turbidity < sd2down | Turbidity > sd2up), T, F),
-         NAFlag = ifelse(is.na(Turbidity), T, F)) %>% 
+         Outlier = ifelse((FNU < sd2down | FNU > sd2up), T, F),
+         NAFlag = ifelse(is.na(FNU), T, F)) %>% 
   ungroup() %>% 
   arrange(Date) %>% 
   # This is part 3 of the query
-  select(Date, SeasonYear, Month, Station, Turbidity, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
+  select(Date, SeasonYear, Month, Station, FNU, meanTurbidity, sd2down, sd2up, Comments, Outlier, NAFlag) %>% 
   mutate(Date = as.Date(Date)) %>% 
   filter(Outlier == T | NAFlag == T,
          SeasonYear %in% yearOfInterest) %>% 
   arrange(NAFlag, Outlier, Date)
 
-# Technical coding section ------------------------------------------------
-# # This section is currently only for checking if my coding is correct. It can be adapted to 
-# # run by the ES's, but the year filters in Access have to be changed as well, so not making
-# # this part of the normal code yet. 
-# # Have checked all queries with the original and they have all matched so far: 02-07-22, TN
-# 
-# # Each of query is a replication of the access version. As such, what is outputted here should be the same
-# # as the Access version; this following function will compare that
-# # Need to be connected to access for this
-# 
-# connectAccess <- function(file,
-#                           exdir = tempdir(),
-#                           surveyName = "SLS") {
-#   
-#   if (exists("con")) {
-#     test <- try(dbIsValid(con))
-#     
-#     if (!inherits(test, "try-error")) {
-#       warning("Access connection already established", call. = F)
-#       return()
-#     }
-#   }
-#   
-#   # In order to use this correctly, you need to have the 32-bit version of R installed
-#   # This function is used with system() below to create an rds file 
-#   # required by the rest of the script
-# 
-#   localDbFile <- file
-#   
-#   if (!file.exists(localDbFile)) stop("File path not found. Did you specify right? Are you on VPN?", call. = F)
-#   
-#   # Driver and path required to connect from RStudio to Access
-#   dbString <- paste0("Driver={Microsoft Access Driver (*.mdb, *.accdb)};",
-#                      "Dbq=", localDbFile)
-#   
-#   # Connection variable itself
-#   con <- tryCatch(DBI::dbConnect(drv = odbc::odbc(), .connection_string = dbString),
-#                   error = function(cond) {
-#                     if (all(stringr::str_detect(cond$message, c("IM002", "ODBC Driver Manager")))) {
-#                       message(cond, "\n")
-#                       message("IM002 and ODBC Driver Manager error generally means a 32-bit R needs to be installed or used.")
-#                     } else {
-#                       message(cond)
-#                     }
-#                   })
-# }
-# 
-# con <- connectAccess("U:\\NativeFish\\SmeltData\\DS-DATA\\SLS_Query.mdb")
-# 
-# checkQueries <- function(rQueryDF, accessQueryName, conn = con,
-#                          meanVar, sdDownName, sdUpName,
-#                          bypass = F) {
-#   
-#   # First, connect to the Access database
-#   accessQueryCompare <- DBI::dbReadTable(name = accessQueryName, conn = conn)
-#   
-#   # Are you both your tables empty?
-#   if (nrow(accessQueryCompare) == 0 & nrow(rQueryDF) == 0) {
-#     # If you've determined that both dataframes SHOULD be empty, then use the bypass argument
-#     if (bypass) {
-#       cat("Bypass was specified for this query. This means that the data tables should truly be empty. Returning TRUE.")
-#       return(T)
-#     }
-#     stop("The returned tables are empty. 
-#          Check the filtered year manually to see if your R query truly reflects the Access query", call. = F)
-#   }
-#   
-#   # Is one of your table empty but the other is not? If so, that's an error
-#   if (nrow(accessQueryCompare) == 0 & nrow(rQueryDF) != 0 | nrow(accessQueryCompare) != 0 & nrow(rQueryDF) == 0) {
-#     warning("The two queries are not the same, one empty and one not.", call. = F)
-#     browser()
-#   }
-# 
-#   # If both of your tables are not empty, then proceed with the rest of the code
-#   yearVariableR <- names(rQueryDF)[str_which(names(rQueryDF), "Year")]
-#   # Are the years the same for both dataset? If not, fix first
-#   # I've accounted for the dynamic naming in the R tables (sometimes Year and others seasonYear)
-#   # May need to account for the Access databases too if it's ever not "Year"
-#   
-#   # First, check if there are actually year columns in the datasets
-#   if (identical(unique(accessQueryCompare$Year) != unique(rQueryDF[[yearVariableR]]), logical(0))) {
-#   
-#     warning("There is a missing year variable in one of the database, Access ", unique(accessQueryCompare$Year),
-#             " R ", unique(rQueryDF[[yearVariableR]]), call. = F)
-#   } else {
-#     if (unique(accessQueryCompare$Year) != unique(rQueryDF[[yearVariableR]])) {
-#       stop("The years are mismatched. Year in Access is ", 
-#            unique(accessQueryCompare$Year), " while in R is ", 
-#            unique(rQueryDF[[yearVariableR]]), call. = F)
-#     }
-#   }
-#   
-#   # If there is an "Outlier" column in the Access talbe, this indicates one of the
-#   # environmental condition tables which will require additional column names, warning below:
-#   if (any(names(accessQueryCompare) %in% "Outlier")) {
-#     accessNames <- names(accessQueryCompare)
-#     
-#     if (any(c(missing(meanVar), missing(sdDownName), missing(sdUpName)))) {
-#       message("Specify meanVar, sdDownName, sdUpName arguments: \n")
-#       
-#       return(print(accessNames))
-#     }
-#     
-#     accessQueryCompare <- try(accessQueryCompare %>% 
-#                                 filter(Outlier == -1) %>% 
-#                                 rename(Mean = sym(meanVar),
-#                                        SdTwoDown = sym(sdDownName),
-#                                        SdTwoUp = sym(sdUpName)) %>%
-#                                 mutate(Outlier = ifelse(Outlier == -1, T, F)))
-#     if (inherits(accessQueryCompare, "try-error")) {
-#       print(accessNames)
-#       stop("Could not rename the columns. Check the provided names.", call. = F)
-#     }
-#   } 
-#   
-#   # rQueryDf == rQueryDFCompare if it is a table that looks at the normality of the data distribution
-#   if (any(names(rQueryDF) %in% "Outlier")) {
-#     rQueryDFCompare <- rQueryDF %>% 
-#       filter(Outlier %in% "TRUE")
-#   } else {
-#     rQueryDFCompare <- rQueryDF
-#   }
-#   
-#   # Does the Access database have a date column? If so, DBI will read it in as
-#   # POSIXct, which will cause a difference in all.equal. Need to convert to Date
-#   classSummaryAccess <- summary.default(accessQueryCompare)[, "Class"]
-#   dateColumnName <- names(classSummaryAccess)[classSummaryAccess %in% "POSIXct"]
-#   
-#   if (length(dateColumnName) > 0) {
-#     dateColumnName <- sym(dateColumnName)
-#     
-#     accessQueryCompare <- accessQueryCompare %>% 
-#       mutate(!!dateColumnName := as.Date(!!dateColumnName)) %>% 
-#       arrange(!!dateColumnName, Station)
-#     # Theoretically, the R dataframe should already be in the date format
-#   }
-#   
-#   if (any(names(rQueryDFCompare) %in% c("Comments.x", "Comments.y"))) {
-#     
-#     commentVector <- syms(names(select(rQueryDFCompare, contains("Comments"))))
-#     
-#     rQueryDFCompare <- rQueryDFCompare %>% 
-#       unite("Comments", !!!commentVector, sep = "") %>%
-#       mutate(Comments = gsub("NA", "", Comments),
-#              Comments = ifelse(Comments %in% "", NA_character_, Comments))
-#   }
-#   
-#   namesCompare <- names(rQueryDFCompare)[names(rQueryDFCompare) %in% names(accessQueryCompare)]
-#   
-#   compare <- all.equal(rQueryDFCompare %>% 
-#                          select(namesCompare) %>% 
-#                          data.frame(),
-#                        accessQueryCompare %>% 
-#                          select(namesCompare) %>% 
-#                          data.frame(),
-#                        # NOTE: this tolerance is here because of single -> double conversion float issue
-#                        # The diff between single and double = 7 vs 14 digits
-#                        tolerance = 1e-7)
-#   
-#   if (!isTRUE(compare)) {
-#     print(compare)
-#     warning("The two queries are not the same. \n", call. = F)
-#     browser()
-#   }
-#   
-#   cat("Check complete. The two queries are the same.\n")
-#   
-#   T
-# }
-# 
-# # IMPORTANT NOTE: this checkQueries function is performed on the rQuery that is BEFORE joining the Tow
-# # data table. After joining, data is duplicated for the 20 mm. So, the FINAL output of the queries
-# # built in R will NOT be the same as the ones in Access since the Access ones do not 
-# 
-# # Make sure the R query filters for the year that is in the Access query itself
-# 
-# checks <- list()
-# 
-# checks$CableDepth <- checkQueries(outliers$CableDepth, "Edit - Cable out VS Depth")
-# 
-# checks$MeterReading <- checkQueries(outliers$MeterReading, "Edit - Net Meter Reading Out of Range")
-# 
-# checks$NetMeterSerial <- checkQueries(outliers$NetMeterSerial, "Edit - Net Meter Serial")
-# 
-# # The TowDuration query returns an empty data frame for both the R and Access queries.
-# # NOTE: might be easier to just check the filters in Access here. These appear to be filtered by date
-# checks$TowDuration <- checkQueries(outliers$TowDuration, "Edit - Tow Duration (outliers)", bypass = T)
-# 
-# checks$BottomDepth <- checkQueries(outliers$BottomDepth, "Edits - Bottom Depth III",
-#                                    meanVar = "Mean", 
-#                                    sdDownName = "X2...Standard.Devations",
-#                                    sdUpName = "X2...Standard.Devations.1")
-# 
-# checks$Temp <- checkQueries(outliers$Temp, "Edits - Temp III",
-#                             meanVar = "Mean", 
-#                             sdDownName = "X2...Standard.Devations",
-#                             sdUpName = "X2...Standard.Devations.1")
-# 
-# checks$TopEC <- checkQueries(outliers$TopEC, "Edits - Top EC III",
-#                              meanVar = "Mean",
-#                              sdDownName = "X2...Standard.Devations",
-#                              sdUpName = "X2...Standard.Devations.1")
-# 
-# checks$BottomEC <- checkQueries(outliers$BottomEC, "Edits - Bottom EC III",
-#                                 meanVar = "Mean",
-#                                 sdDownName = "X2...Standard.Devations",
-#                                 sdUpName = "X2...Standard.Devations.1")
-# 
-# checks$Secchi <- checkQueries(outliers$Secchi, "Edits - Secchi III",
-#                               meanVar = "Mean",
-#                               sdDownName = "X2...Standard.Devations",
-#                               sdUpName = "X2...Standard.Devations.1")
-# # There's a turbidity check in this script but none in the current Access database. 
-# # checks$Turbidity
-# 
-# # There isn't a check for turbidity as turbidity in the SLS db does not exist
-# # All checks should be TRUE, indicating the same output from the script and the query
-# if (!all(unlist(checks))) stop("Checks are not all equal")
-# # All queries check out. Checked by TN 3-17-22
+# Adding CDEC station info to the Temp, ec, and turbidity outlier  --------
+source("R/cdecHelpers.R")
 
-# Various plots for station vs station/months -----------------------------
-# # These are simply exploratory plots to see how the two variants differ from one another
-# # Does one variant yield much more "outliers" than others?
-# 
-# data$WaterInfo %>%
-#   group_by(Station, Month = month(Date)) %>%
-#   mutate(# This is part 1 of the query
-#     meanTemp = mean(Temp, na.rm = T),
-#     sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-#     sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
-#     # This is part 2 of the query
-#     Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
-#     NAFlag = ifelse(is.na(Temp), T, F)) %>%
-#   arrange(Date) %>%
-#   # This is part 3 of the query
-#   select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
-#   mutate(Date = as.Date(Date)) %>%
-#   ggplot(aes(Date, Temp, color = Outlier)) +
-#   geom_point() +
-#   labs(title = "Grouped by station and month")
-# # Seems like for temp, it might be worth it to use a "region" to calculate the mean/sd or exclude certain stations
-# # Alot of these outliers also appear to have occurred during the drought, with the higher temps being a bit outlying
-# 
-# data$WaterInfo %>%
-#   group_by(Station) %>%
-#   mutate(# This is part 1 of the query
-#     meanTemp = mean(Temp, na.rm = T),
-#     sd2down = meanTemp - 2 * sd(Temp, na.rm = T),
-#     sd2up = meanTemp + 2 * sd(Temp, na.rm = T),
-#     # This is part 2 of the query
-#     Outlier = ifelse((Temp < sd2down | Temp > sd2up), T, F),
-#     NAFlag = ifelse(is.na(Temp), T, F)) %>%
-#   arrange(Date) %>%
-#   # This is part 3 of the query
-#   select(Date, Station, Temp, meanTemp, sd2down, sd2up, Comments, Outlier, NAFlag) %>%
-#   mutate(Date = as.Date(Date)) %>%
-#   ggplot(aes(Date, Temp, color = Outlier)) +
-#   geom_point() +
-#   labs(title = "Grouped by station Only")
-# 
-# # As expected, the "only station" variant will flag extreme values across all years, so mostly during the drought, while
-# # the Month variant will have more subtle outliers that appears to be similar to other datapoints around it when plotted
-# # this way
-# 
-# # How many more outliers are in the monthly variant?
-# purrr::map_df(outliers, function(x) data.frame = c(n = nrow(x)), .id = "parameter") %>% 
-#   mutate(scale = ifelse(str_detect(parameter, "Month"), "Station, Month", "Station"),
-#          parameter = str_remove(parameter, "Month"),
-#          parameter = factor(parameter, levels = c(.$parameter))) %>% 
-#   ggplot(aes(parameter, n, fill = scale)) + 
-#   geom_col(position = "dodge") +
-#   labs(title = "Number of outliers similar, more varied on location of outliers")
-# # About the same amount of outliers either way; personally think it's very slightly more robust to at least
-# # try and account for seasonality if this comparison to the 95% of all values approach is to be kept. There
-# # doesn't seem to be to many more flagged values
+# Prep to populate CDEC data to a table of outliers
+# Read in a table of CDEC stations assigned to each station
+cdec <- read_csv("data-raw/CDEC20mm.csv",
+                 col_types = cols(
+                   `20-mm Station` = col_double(),
+                   `CDEC station 1` = col_character(),
+                   `CDEC station 2` = col_character(),
+                   `CDEC station 3` = col_character(),
+                   Comment = col_character()
+                 )) %>% 
+  rename(Station = `20-mm Station`,
+         first = `CDEC station 1`,
+         second = `CDEC station 2`,
+         third = `CDEC station 3`,
+         CDECcomment = Comment)
 
-# # QAQC FL -----------------------------------------------------------------
-# 
-# data$Lengths %>% 
-#   group_by(Month = month(Date),
-#            FishCode) %>% 
-#   mutate(# This is part 1 of the query
-#     meanLengths = mean(Length, na.rm = T),
-#     sd2down = meanLengths - 2 * sd(Length, na.rm = T),
-#     sd2up = meanLengths + 2 * sd(Length, na.rm = T),
-#     # This is part 2 of the query
-#     # Why this 12-31 cut off...? Ask Adam ####
-#     Outlier = ifelse((Length < sd2down | Length > sd2up) & Date > as.Date("2012-12-31"), T, F),
-#     NAFlag = ifelse(is.na(Length), T, F)) %>% 
-#   arrange(Date) %>% 
-#   # This is part 3 of the query
-#   select(Date, Month, FishCode, Length, meanLengths, sd2down, sd2up, Outlier, NAFlag) %>% 
-#   mutate(Date = as.Date(Date)) %>% 
-#   filter(Outlier == T | NAFlag == T) %>% 
-#   arrange(NAFlag, Outlier, Date) %>% 
-#   View()
-# 
-# # Turkey's fence, 1.5 and 3.0
-# data$Lengths %>% 
-#   group_by(Month = month(Date),
-#            FishCode) %>% 
-#   mutate(# This is part 1 of the query
-#     quant25 = quantile(Length, probs = 0.25, na.rm = T),
-#     quant75 = quantile(Length, probs = 0.75, na.rm = T),
-#     iqr = quant75 - quant25,
-#     Outlier = ifelse((Length < quant25 - (iqr * 3) | Length > quant75 + (iqr * 3)) & Date > as.Date("2012-12-31"), T, F),
-#     NAFlag = ifelse(is.na(Length), T, F)) %>% 
-#   arrange(Date) %>% 
-#   # This is part 3 of the query
-#   select(Date, Month, FishCode, Length, quant25, quant75, iqr, Outlier, NAFlag) %>% 
-#   mutate(Date = as.Date(Date)) %>% 
-#   filter(Outlier == T | NAFlag == T) %>% 
-#   arrange(NAFlag, Outlier, Date) %>% 
-#   View()
-# # Much harder with fish data lol
+# Function to pull in metadata of all stations in the CDEC data table
+metadata <- cdec %>% 
+  pivot_longer(c(first, second, third),
+               names_to = "priority", values_to = "gage") %>% 
+  filter(!is.na(gage)) %>% 
+  distinct(gage) %>% 
+  pull(gage) %>% 
+  # This function is sourced from cdecHelpers.R
+  pullMetadataCDEC()
 
+# Update these outlier data frames from original with these new ones. A more effective way to do this is to
+# actually pipe the populate CDEC function right into the QAQC scripts. However, doing this here in case
+# ES in charge do not want to run this additional step and only want the QAQC output.
+outliers[which(names(outliers) %in% c("Temp", "TempMonth", "TopEC", "TopECMonth", 
+                                      "BottomEC", "BottomECMonth", "Turbidity", "TurbidityMonth"))] <- 
+  mapply(popCDEC, 
+         df = list(outliers$Temp, outliers$TempMonth, outliers$TopEC, outliers$TopECMonth, 
+                   outliers$BottomEC, outliers$BottomECMonth, outliers$Turbidity, outliers$TurbidityMonth),
+         variable = c("temp", "temp", "ec", "ec", "ec", "ec", "turbidity", "turbidity"),
+         waterColumn = c("top", "top", "top", "top", "lower", "lower", "top", "top"),
+         MoreArgs = list(dfTime = data$TowInfo, cdec = cdec, metadata = metadata)) %>% 
+  setNames(c("Temp", "TempMonth", "TopEC", "TopECMonth", "BottomEC", "BottomECMonth", "Turbidity", "TurbidityMonth"))
 
 # Saving all outlier DFs to an excel sheet for analysis -------------------
 
