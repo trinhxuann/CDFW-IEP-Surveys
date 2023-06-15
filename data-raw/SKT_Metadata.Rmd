@@ -50,7 +50,7 @@ makeKable <- function(df, caption = NULL, width = "100%", ...) {
 }
 
 # Joined SKT dataset
-SKT <- read.csv(file.path("SKT", "sktJoined.csv")) %>%
+SKT <- read.csv(file.path("SKT", "filesToUpload", "sktJoined.csv")) %>%
   mutate(SampleDate = as.Date(SampleDate))
 ```
 
@@ -85,7 +85,6 @@ Phone: (209) 234-3420 Fax: (209) 234-3689
 
 ## Study Design
 
-**Geographic range of work:** 
 ```{r, overall map, echo = F, results='asis'}
 # This file is simply the 47 stations in the StationCords.csv file + the 5 high outflow stations
 # I've added the status column myself for plotting below
@@ -93,8 +92,7 @@ Phone: (209) 234-3420 Fax: (209) 234-3689
 mapDF <- SKT %>% 
   distinct(StationCode, LatitudeTheoretical, LongitudeTheoretical) %>% 
   drop_na() %>%
-  mutate(Status = ifelse(StationCode != 719, "Core", "Noncore"),
-         LongitudeTheoretical = -LongitudeTheoretical) %>% 
+  mutate(Status = ifelse(StationCode != 719, "Core", "Noncore")) %>% 
     mutate(Status = factor(Status,
                            levels = c("Core", "Noncore")),
            offsetX = 18,
@@ -148,24 +146,33 @@ m %>%
   #             lat2 = 38.2891852849442, lng2 = -121.38259035764148) %>%
   mapshot(file = "sktMap.png", cliprect = "viewport",
           vwidth = 850, vheight = 500, zoom = 5)
+
+numberOfStations <- SKT %>% distinct(StationCode, LatitudeTheoretical, LongitudeTheoretical) %>% drop_na %>% nrow()
 ```
-
-![The geographic range of the SKT Survey covers a total of `r SKT %>% distinct(StationCode, LatitudeTheoretical, LongitudeTheoretical) %>% drop_na %>% nrow()` primary sampling stations, each represented by a point on the map. The stations are color-coded based on their relationship with the SKT index calculation: blue "core" stations that are included in the calculation, and red "non-core" station(s) that is/are not included.](sktMap.png){width=600px}
-
-**Number of sites:** `r length(unique(filter(mapDF, Status != "Noncore")$StationCode))` core stations that have been sampled since 2002 (survey's inception). Beginning in 2005, `r length(unique(filter(mapDF, Status == "Noncore")$Station))` additional station was added. See the [$\color{link}{\text{metadata section}}$](#metadata) for additional details.
 
 **Data range:** `r min(SKT$SampleDate)` to `r max(SKT$SampleDate)` (YYYY-mm-dd)
 
 **Sampling frequency**: Sampling begins January and is conducted monthly. Sampling ends in the late spring (**month? May?**) or when spawning Delta Smelt can no longer be detected **(What are these specific ending conditions?)**. Standard sampling surveys are numbered 1-9, while supplemental sampling surveys are identified as $\ge$ 10.
 
+**Number of sites:** `r length(unique(filter(mapDF, Status != "Noncore")$StationCode))` core stations that have been sampled since 2002 (survey's inception). Beginning in 2005, `r length(unique(filter(mapDF, Status == "Noncore")$Station))` additional station was added. See the [$\color{link}{\text{metadata section}}$](#metadata) for additional details.
+
+\newpage
+
+**Geographic range of work:** 
+```{r, map image, fig.pos="H", out.width="100%", fig.cap=paste("The geographic range of the SKT Survey covers a total of", numberOfStations, "primary sampling stations, each represented by a point on the map. The stations are color-coded based on their relationship with the SKT index calculation: blue `core` stations that are included in the calculation, and red `non-core` station(s) that is/are not included.")}
+knitr::include_graphics("sktMap.png")
+```
+
 ## Field Sampling Methods
 
-**Net:** The SKT employs a standard Kodiak trawl. A weighted foot-rope and head-rope with floats allows the trawl to fish the top 1.8 meter of the water column. Specifications:
+The SKT is a standard Kodiak trawl design.
+
+**Net:** A weighted foot-rope and head-rope with floats allows the trawl to fish the top 1.8 meter of the water column.
 \vspace{-3truemm}
 
   1. Net length: 19.8 m
   2. Mouth opening (fully opened): 7.62 m by 1.83 m (an area of 13.9446 $m^{2}$) 
-  3. Mesh size: variable; from 2" knotted stretched mesh at the mouth, decreasing by $\frac{1}{2}^{"}$ across a series of 5 panels to $\frac{1}{4}^{"}$ knotless stretched mesh at the cod-end. The cod end mesh size has changed several times over the years, specifically in 2004 and 2007 (Table 4). New nets were incorporated in 2014 but were made to specifications of the previous nets.
+  3. Mesh size: variable; from 2" knotted stretched mesh at the mouth, decreasing by $1/2^{"}$ across a series of 5 panels to $1/4^{"}$ knotless stretched mesh at the cod-end. The cod end mesh size has changed several times over the years, specifically in 2004 and 2007 (Table 4). New nets were incorporated in 2014 but were made to specifications of the previous nets.
   
 \vspace{-2truemm}
 **Biotic Data:** The SKT is a fish survey with the primary goal of monitoring Delta Smelt, which is a surface oriented fish. However, all other fish, jellyfish, and shrimp species are also sampled if captured during a tow (all other invertebrate are not sampled; see Table 6). With exceptions of years early in the program (Table 4), all samples are processed, counted, and measured on board after each tow; only unidentifiable fish are returned to the CDFW Stockton laboratory for positive identification.
@@ -180,9 +187,8 @@ data.frame(Variable = c("Water temperature (surface)", "Water EC (surface)", "Wa
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
-## FILL in missing data for flow meter equipment
+## FILL in missing data for flow meter equipment above
 
-\newpage
 **Tow:**
 \vspace{-3truemm}
 
@@ -202,7 +208,7 @@ data.frame(Variable = c("Water temperature (surface)", "Water EC (surface)", "Wa
   3. Unidentifiable fish are placed into 10% formalin and returned to the CDFW Stockton lab for identification.
   4. Certain species are retained for further studies. Specifically, Longfin Smelt and Wakasagi are retained in ethanol, Delta Smelt in liquid nitrogen, and clipped salmonids in ice. All other species are released after being counted and measured. Sex and sexual maturity data are collected only for Delta Smelt, unless there is a special request for Longfin Smelt or a misidentification occurs. 
 
-\vspace{-2truemm}
+\vspace{-1truemm}
 **Delta Smelt:** The SKT focuses on the Delta Smelt and special considerations are given to the species. There are additional processing  done to obtain sex and maturity data (Table 5) of all caught Delta Smelt and to collect various other components of the fish, e.g., eggs from ripe females, for further studies. The logistics for this additional processing have evolved over time:
 
 ```{r delta smelt processing logistic}
@@ -297,6 +303,7 @@ $F_{m,l}$ = measured frequency of each recorded length $l$
 $T_{m}$ = total number of fish measured
 
 ## Data management
+\vspace{-3truemm}
 
   1. Application: Microsoft Office Access database
   2. Datasheets: all hard copies are retained at the CDFW Stockton Office
@@ -307,10 +314,13 @@ $T_{m}$ = total number of fish measured
       + Frequency: per week for the CDFW Tier 3 server and per season for the CDFW FTP website and EDI repository. Due to the weekly frequency, data on the Tier 3 server includes more preliminary data than data on the FTP and EDI locations, and is meant to inform real-time management.
 
 ## The provided data tables
+\vspace{-3truemm}
 
 Tables "tblCatch", "tblFishInfo", "tblOrganismCodes", "tblSample", and "tblStationCoordiantes" are available “relational tables” from the SKT Access database. These tables are presented "as-is", exported directly from Access from R without any modifications. The “sktJoined” table is the integrated dataset that combines these relational tables together (Figure 2) with various manipulations to make the data as usable as possible. Users should be aware of the differences in units and column names of the recorded values between the relational and integrated tables (documented in the metadata section of the EDI publication page). All steps are coded in R and the relevant codes are provided in the EDI publication and/or housed on [trinhxuann/CDFW-IEP-Surveys Github page](https://github.com/trinhxuann/CDFW-IEP-Surveys).
 
-![The relational schema between the relational tables in the SKT database, used to produce the "sktJoined" table.](./skt/sktRelationalSchema.png){width=100%}
+```{r, schema, fig.pos="H", out.width="100%", fig.cap="The relational schema between the relational tables in the SKT database, used to produce the `sktJoined` table."}
+knitr::include_graphics(file.path("skt", "sktRelationalSchema.png"))
+```
 
 ## Station Metadata {#metadata}
 
@@ -318,7 +328,9 @@ Tables "tblCatch", "tblFishInfo", "tblOrganismCodes", "tblSample", and "tblStati
 SKT %>% 
     group_by(StationCode) %>%
     slice(1, n()) %>% 
-    select(SampleDate, StationCode) %>%
+    transmute(SampleDate, StationCode, 
+              Latitude = LatitudeTheoretical, 
+              Longitude = LongitudeTheoretical) %>%
     mutate(start = c("StartDate", "EndDate")) %>%
     ungroup() %>%
     tidyr::pivot_wider(names_from = "start", values_from = "SampleDate") %>%
@@ -329,7 +341,7 @@ SKT %>%
     select(-order) %>% 
     # Joining to mapDF to grab the type of station
     left_join(select(mapDF, StationCode, Status), by = "StationCode") %>% 
-    kbl(booktabs = T, longtable = T, caption = paste0("List of stations sampled by SKT since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station, ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey. The non-core station(s) is/are not included in the SKT Delta Smelt Index of Relative Abundance due to being included after the inception of the survey, but are still regularly sampled.")) %>% 
+    kbl(booktabs = T, longtable = T, caption = paste0("List of stations sampled by SKT since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station, ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey. The non-core station(s) is/are not included in the SKT Delta Smelt Index of Relative Abundance due to being included after the inception of the survey, but are still regularly sampled. Latitude and longitude coordinates are provided for only stations that have ongoing sampling.")) %>% 
     kable_styling(latex_options = "striped")
 ```
 

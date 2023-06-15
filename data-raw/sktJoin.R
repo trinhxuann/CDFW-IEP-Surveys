@@ -9,7 +9,7 @@ library(tidyr)
 source("~/Git/CDFW-IEP-Surveys/R/bridgeAccess.R")
 
 # Connect -----------------------------------------------------------------
-data <- bridgeAccess(file = "C:/Users/txnguyen/Desktop/SKT_Query.accdb", 
+data <- bridgeAccess(file = "U:/NativeFish/SmeltData/DS-DATA/SKT_Query.accdb", 
                      tables = c("tblSample", "tblCatch", "tblOrganismCodes", 
                                 "tblFishInfo", "SKT Station Sort Order for Reporting"), 
                      script = "~/Git/CDFW-IEP-Surveys/R/connectAccess.R") %>% 
@@ -19,8 +19,6 @@ data <- bridgeAccess(file = "C:/Users/txnguyen/Desktop/SKT_Query.accdb",
 # Relational schema -------------------------------------------------------
 
 relationalSchema <- as_dm(data) %>% 
-  # dm_select_tbl("tblSample", "tblCatch", "tblOrganismCodes", 
-  #               "tblFishInfo") %>% 
   dm_add_pk(tblSample, SampleRowID) %>% 
   dm_add_pk(tblCatch, CatchRowID) %>% 
   dm_add_pk(tblOrganismCodes, OrganismCode) %>% 
@@ -58,7 +56,7 @@ joined <- data$tblSample %>%
   left_join(data$tblStationCoordinates %>% 
               transmute(Station,
                         LatitudeTheoretical = LatDeg + LatMin/60 + LatSec/3600,
-                        LongitudeTheoretical = LongDeg + LongMin/60 + LongSec/3600),
+                        LongitudeTheoretical = -(LongDeg + LongMin/60 + LongSec/3600)),
             by = c("StationCode" = "Station")) %>% 
   mutate(across(c(LatDeg, LatMin, LatSec, LongDeg, LongMin, LongSec),
                 ~as.numeric(.x))) %>% 
