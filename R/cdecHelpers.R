@@ -183,16 +183,18 @@ popCDEC <- function(df,
     data.frame() %>% 
     pivot_longer(c(first, second, third), 
                  names_to = "priority", values_to = "cdecGage")
-  
+ 
   gagesOfInterest <- na.omit(unique(joinedDF$cdecGage))
   
   if (length(gagesOfInterest) > 0) {
    
-    filteredMetadata <- lapply(na.omit(unique(joinedDF$cdecGage)), function(x) {
+    filteredMetadata <- lapply(gagesOfInterest, function(x) {
       
       dfFiltered <- metadata[[x]] %>%
         filter(grepl(variableWanted, sensorDescription, ignore.case = T))
       
+      # The script will PREFER top/bottom sensors IF there are both. If there is only one,
+      # will disregard depth and prioritize getting data on that metric instead
       if (nrow(dfFiltered) > 1) {
         if (waterColumnWanted == "lower") {
           dfFilteredWaterColumn <- dfFiltered %>%
@@ -289,7 +291,8 @@ popCDEC <- function(df,
                 filter(is.na(cdecGage))) %>% 
     pivot_wider(names_from = "priority", 
                 values_from = c("cdecGage", "SensorNumber", "Duration", "valueCDEC", "closestTime")) %>% 
-    relocate(contains("valueCDEC"), .before = contains("mean"))
+    relocate(contains("valueCDEC"), .before = contains("mean")) %>% 
+    mutate(needAssignment = ifelse((is.na(CDECcomment) & is.na(cdecGage_first)), T, NA))
 }
 
 parPopCDEC <- function(df, 

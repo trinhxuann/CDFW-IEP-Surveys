@@ -12,6 +12,8 @@ output:
     toc_depth: 2
     number_sections: no
     theme: lumen
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- Changing things to be at least 12 pt font -->
@@ -107,7 +109,7 @@ mapDF <- read.csv(file.path("SLS", "Station_Lookup.csv")) %>%
                                   TRUE ~ c(0)))
 
 m <- leaflet(mapDF) %>%
-    addProviderTiles(providers$Esri.OceanBasemap)
+    addProviderTiles(providers$CartoDB.VoyagerNoLabels)
 
 stationList <- mapDF %>%
     split(., .$Station)
@@ -131,11 +133,11 @@ names(stationList) %>%
 m %>%
   addLegend(pal = pal, values = ~Status, opacity = 1) %>%
   setView(lat = 38.06979067575653, lng = -121.84727645926255, zoom = 10) %>%
-  mapshot(file = "SLSMap.png", cliprect = "viewport",
-          vwidth = 850, vheight = 500)
+  mapshot(file = "slsMap.png", cliprect = "viewport",
+          vwidth = 850, vheight = 500, zoom = 5)
 ```
 
-![Map displaying the geographic range of work. Each point represents the location of a sampling station. Stations in the southern and central Delta (809-919) and at Barker Slough (716) have monitoring requirements tied to the 2020 SWP Incidental Take Permit (ITP) and are uniquely colored.](SLSMap.png){width=600px}
+![Map displaying the geographic range of work. Each point represents the location of a sampling station. Stations in the southern and central Delta (809-919) and at Barker Slough (716) have monitoring requirements tied to the 2020 SWP Incidental Take Permit (ITP) and are uniquely colored.](slsMap.png){width=600px}
 
 **Number of sites:** `r length(unique(SLS$Station))` stations. See the [metadata section](#metadata) for additional details of each station.
 
@@ -154,6 +156,38 @@ m %>%
 **Tow:** A single 10 minute stepped oblique tow with the boat moving at 1 m/s is conducted at each of the 44 sampling stations. The amount of cable released is dependent on the water depth at the station. A gradual oblique tow is achieved following the tow schedule specific to the amount of cable released and the duration of the tow. Although most tows are 10 minutes in length, tow time can be reduced during periods of heavy samples. If the net is clogged during algal blooms, jellyfish blooms, or heavy debris events the tow time can be reduced to 5 or 2.5 minutes, an alternate tow schedule is followed, and the duration is recorded. If material is still overflowing from the cod-end jar in a 2.5 minute tow, the entire station is dropped. Re-tows can occur if a sample is compromised or the flowmeter reading is less than 10000 or greater than 30000 m in a 10 minute tow. All abnormal events are to be recorded in the "comments" section of the datasheet.
 
 **Environmental and water quality data:** Immediately prior to each tow, bottom and surface water samples are independently collected. From these water samples: 1) surface water temperature (°C) and surface and bottom EC ($\mu$S/cm, normalized at 25 °C) are recorded using a calibrated (before each season) and rinsed YSI Model 30; and 2) surface turbidity (NTU) is recorded using a calibrated (before each season) HACH 2100p turbidity meter (sample vials are cleaned before each sample). Secchi depth (m) is measured using Secchi discs mounted to rigid meter sticks to a maximum depth of two meters; values are measured in the shade without sunglasses on, off the side of the boat by the same person for the day for consistency. Water bottom depth (ft) is recorded using a depth finder on the boat. Tide data is recorded as the visually observed tidal stage by the crew during the tow as high slack, ebb, low slack, or flood.
+
+```{r table of equipment used to measure abiotic data}
+data.frame(Variable = c("Water temperature (surface)", 
+                        "Water EC (surface)", 
+                        "Water EC (bottom)",
+                        "Water turbidity (surface)",
+                        "Water turbidity (surface)",
+                        "Secchi depth", 
+                        "Flow meter", 
+                        "Depth", 
+                        "Tide"),
+           Equipment = c("YSI ProDSS", 
+                         "YSI ProDSS", 
+                         "YSI ProDSS", 
+                         "YSI ProDSS",
+                         "HACH 2100p",
+                         "Two meter sticks", 
+                         "General Oceanics 2030R", 
+                         "Onboard meter", 
+                         "Visual"),
+           Unit = c(paste0("\U00B0", "C"), 
+                    paste0("\U00B5", "m/cm"),
+                    paste0("\U00B5", "m/cm"),
+                    "FNU", 
+                    "NTU",
+                    "m", 
+                    "", 
+                    "Feet", 
+                    "")) %>% 
+  kbl(booktabs = T, linesep = "", caption = "The SLS collects various environmental data per station.") %>%
+  kable_styling(latex_options = c("striped", "hold_position"))
+```
 
 **Catch data:** At the end of every tow, the net is washed down so that all visible vegetation, fish, sand, and debris are washed into the cod-end jar. Large debris and adult fish ($\ge$ 50 mm) can be removed if positively identified. If salmonids were caught, fork lengths are measured, presence of the adipose fin noted, and the fish are immediately released gently and alive. All other larval and juvenile fish are kept in distinctively labeled sampling jars and preserved in 10% buffered and dyed formalin for later processing in the laboratory.
 
@@ -220,54 +254,14 @@ $F_{m,l}$ = measured frequency of each recorded length $l$
 
 $T_{m}$ = total number of fish measured
 
+\newpage
+
 ## Project history
 
 The table below is a timeline of critical changes to the survey methods since its inception. The years listed below are water years, which begins three months before the new calendar year on October 1.
 
 ```{r history table, results='asis'}
-# This is a really ugly way to make this table. It's prettier to make this in an excel file, but leaving this as is for now
-
-df <- bind_rows(
-data.frame(waterYear = 2009,
-           Note = "Project start. Five biweekly Delta-wide (35 stations) surveys conducted from early January to early March"),
-data.frame(waterYear = rep(2010, 3),
-           Note = c("Temporal extension of sampling temporarily for this season; six biweekly (35 stations) surveys conducted from early January to late March (this addition lasted only this season)",
-                    "Implementation of using a Hach Model 2100P Turbidimeter as Standard Operating Procedure to record turbidity in NTU's",
-                    "Recorded sampling latitude and longitude on datasheets, but this data was not entered into the database.")),
-data.frame(waterYear = rep(2011, 2),
-           Note = c("Latitude and longitude of tows recorded into database",
-                    "Yolk sac and oil globule presence noted in the data")),
-data.frame(waterYear = 2012,
-           Note = "Sixth survey permanently added"),
-data.frame(waterYear = 2013,
-           Note = NA),
-data.frame(waterYear = rep(2014, 3),
-           Note = c("Spatial extension of sampling into the Napa River as part of an agreement with the State Water Contractors (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349)",
-                    "Database was revised by Tuongvan Nguyen at ITB as part of the Bay Delta Application Hosting to move public facing data onto a secured Tier 3 server. Data is now entered into SLS_Query.accdb (local server), and appended to the Tier 3 server before uploading to the public webpage",
-                    "New nets were incorporated (manufactured on 5/10/2013 by Lodi Tent and Awning) with a different Nitex Mesh purchased from Sefar (500 micron, 47% open space, part #06-500/47)")),
-data.frame(waterYear = 2015,
-           Note = "Factory k value (0.026873027) used in the `MeterCorrections` table. Flowmeters were not calibrated at UC Davis due to machinery malfunction. The facility is awaiting repairs."),
-data.frame(waterYear = 2016,
-           Note = "Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season."),
-data.frame(waterYear = 2017,
-           Note = "Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season."),
-# Does this mean that the flowmeters were not sent to GO for refurbishing?
-data.frame(waterYear = 2018,
-           Note = "Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season"),
-data.frame(waterYear = rep(2019, 3),
-           Note = c("Continued using factory k value for `MeterCorrections.` Flowmeters were sent to General Oceanics for refurbishing prior to field season or replaced with new meters if readings are inaccurate (assessed at the end of a season)",
-                    "Spatial reduction of sampling. Ceased sampling stations within the Napa River (stations 340, 342, 343, 344, 345, 346, 347, 348, and 349)",
-                    "On 2019-09-10, two tables were removed from the local copy of the database: `Zooplankton` and `Zoo Catch`. These tables were appended to the database from the 20–mm database back in 2013. The SLS survey does not survey for zooplankton. More information and a copy of the tables can be found on the local server: U:/NativeFish/SmeltData/Zooplankton/SLS_Erroneous_ZooTables.xlsx")),
-data.frame(waterYear = 2020,
-           Note = NA),
-data.frame(waterYear = 2021,
-           Note = "Spatially constrained, temporal extension of sampling: two additional surveys were added in December and were limited in geographic range to the south/central Delta to inform risk of entrainment for larval Longfin Smelt."),
-data.frame(waterYear = 2022,
-           Note = ("The two additional surveys in December are expanded to encompass all stations. Napa River stations (340, 342, 343, 344, 345, 346, 347, 348, and 349) have been added back to the surveys, including the supplemental December surveys."))
-
-)
-
-# df <- read.csv("yearlyChanges_SLS.csv")
+df <- read.csv("yearlyChanges_SLS.csv")
 
 pos <- df %>%
   mutate(rowIndex = row_number(waterYear)) %>%
@@ -278,10 +272,13 @@ pos <- df %>%
   pull(rowIndex)
 
 df %>%
-  kbl(booktabs = T, caption = "History of substantial changes to the SLS Survey since its inception. Rows are highlighted per unique water year.") %>%
+  rename("Water Year" = waterYear) %>% 
+  kbl(booktabs = T, longtable = T, caption = "History of substantial changes to the SLS Survey since its inception. Rows are highlighted per unique water year.") %>%
   row_spec(pos, background = "#EEEEEE") %>%
   column_spec(2, width = "40em")
 ```
+
+\newpage
 
 ## Station metadata {#metadata}
 
@@ -294,64 +291,80 @@ SLS %>% group_by(Station, Latitude, Longitude) %>%
     ungroup() %>%
     tidyr::pivot_wider(names_from = "start", values_from = "Date") %>%
     # Going to just say that anything taken 30 days since the last date in the dataset == ongoing survey
-    mutate(EndDate = if_else(EndDate >= max(LTMRdata::SLS$Date) - 30, "Ongoing", as.character(EndDate))) %>%
-    makeKable(caption = paste0("List of stations sampled by SLS since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station; ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey."))
+    mutate(EndDate = if_else(EndDate >= as.Date(max(SLS$Date)) - 30, "Ongoing", as.character(EndDate))) %>%
+    kbl(booktabs = T, longtable = T, caption = paste0("List of stations sampled by SLS since its inception. ", dQuote("StartDate"), " indicates the date when sampling first began for a station; ", dQuote("EndDate"), " indicates the date when sampling last ended at a station, and ", dQuote("Ongoing"), " represents stations that are still actively sampled by the survey."))
 ```
 
-```{r, station figure, fig.width=20, fig.height=18, fig.cap="The number of times a station was surveyed per water year is shown in various colors, following documentation present in Table 1. No color indicates that a station was not sampled for that water year."}
-SLS %>%
-    distinct(waterYear = as.factor(as.numeric(format(as.Date(Date), "%Y")) + (as.numeric(format(as.Date(Date), "%m")) > 9)),
-             Station, Survey) %>%
-    group_by(waterYear, Station, Survey) %>%
-    count() %>%
-    group_by(waterYear, Station = as.character(Station)) %>%
-    summarise(numSurvey = sum(n)) %>%
-  {
-    ggplot(data = ., aes(waterYear, Station, fill = factor(numSurvey, levels = sort(unique(.$numSurvey))))) +
-      geom_tile(color = "black") +
-      scale_y_discrete(limits = rev) +
-      scale_fill_manual(values = c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF", "#008A32")) +
-      labs(title = "Number of surveys per station per water year",
-           fill = "Number of surveys",
-           x = "Water Year") +
-      theme_classic(base_size = 35) +
-      theme(legend.position = "bottom")
-  }
-```
+<!-- ```{r, station figure, fig.width=20, fig.height=18, fig.cap="The number of times a station was surveyed per water year is shown in various colors, following documentation present in Table 1. No color indicates that a station was not sampled for that water year."} -->
+<!-- SLS %>% -->
+<!--     distinct(waterYear = as.factor(as.numeric(format(as.Date(Date), "%Y")) + (as.numeric(format(as.Date(Date), "%m")) > 9)), -->
+<!--              Station, Survey) %>% -->
+<!--     group_by(waterYear, Station, Survey) %>% -->
+<!--     count() %>% -->
+<!--     group_by(waterYear, Station = as.character(Station)) %>% -->
+<!--     summarise(numSurvey = sum(n)) %>% -->
+<!--   { -->
+<!--     ggplot(data = ., aes(waterYear, Station, fill = factor(numSurvey, levels = sort(unique(.$numSurvey))))) + -->
+<!--       geom_tile(color = "black") + -->
+<!--       scale_y_discrete(limits = rev) + -->
+<!--       scale_fill_manual(values = c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF", "#008A32")) + -->
+<!--       labs(title = "Number of surveys per station per water year", -->
+<!--            fill = "Number of surveys", -->
+<!--            x = "Water Year") + -->
+<!--       theme_classic(base_size = 35) + -->
+<!--       theme(legend.position = "bottom") -->
+<!--   } -->
+<!-- ``` -->
+
+<!-- \newpage -->
+
+<!-- ```{r table of station figure 2} -->
+<!-- SLS %>% -->
+<!--     distinct(waterYear = as.factor(as.numeric(format(as.Date(Date), "%Y")) + (as.numeric(format(as.Date(Date), "%m")) > 9)), -->
+<!--              Station, Survey) %>% -->
+<!--     group_by(waterYear, Station, Survey) %>% -->
+<!--     count() %>% -->
+<!--     group_by(waterYear, Station) %>% -->
+<!--     summarise(numSurvey = sum(n)) %>% -->
+<!--   rename("Water Year" = waterYear, -->
+<!--          "Number of Surveys" = "numSurvey") %>% -->
+<!--   kbl(booktabs = T, longtable = T, caption = "Frequency of number of surveys at each station in the SLS Survey per water year since its inception in 2009.") %>% -->
+<!--   kable_styling(latex_options = "repeat_header") -->
+
+<!-- # This is the grayscale version that is 100% colorblind friendly and contrast-correct: -->
+<!-- # LTMRdata::SLS %>% -->
+<!-- #   distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)), -->
+<!-- #            Station, Survey) %>% -->
+<!-- #   group_by(waterYear, Station, Survey) %>% -->
+<!-- #   count() %>% -->
+<!-- #   group_by(waterYear, Station) %>% -->
+<!-- #   mutate(numSurvey = sum(n)) %>% -->
+<!-- #   { -->
+<!-- #     ggplot(data = ., aes(waterYear, Station, fill = factor(numSurvey, levels = sort(unique(.$numSurvey))))) + -->
+<!-- #       geom_tile(color = "grey50") + -->
+<!-- #       geom_text(aes(label = numSurvey), color = "#FFFFFF", size = 5.5) + -->
+<!-- #       scale_y_discrete(limits = rev) + -->
+<!-- #           scale_fill_manual(values = c("#595959", "#383838", "#1F1F1F", "#000000")) + -->
+<!-- #       labs(title = "Number of surveys per station per water year", -->
+<!-- #            fill = "Number of surveys", -->
+<!-- #            x = "Water Year") + -->
+<!-- #       theme_classic(base_size = 24) + -->
+<!-- #       theme(legend.position = "bottom") -->
+<!-- #   } -->
+<!-- ``` -->
 
 \newpage
 
-```{r table of station figure 2}
-SLS %>%
-    distinct(waterYear = as.factor(as.numeric(format(as.Date(Date), "%Y")) + (as.numeric(format(as.Date(Date), "%m")) > 9)),
-             Station, Survey) %>%
-    group_by(waterYear, Station, Survey) %>%
-    count() %>%
-    group_by(waterYear, Station) %>%
-    summarise(numSurvey = sum(n)) %>%
-  rename("Water Year" = waterYear,
-         "Number of Surveys" = "numSurvey") %>%
-  kbl(booktabs = T, longtable = T, caption = "Frequency of number of surveys at each station in the SLS Survey per water year since its inception in 2009.") %>%
-  kable_styling(latex_options = "repeat_header")
+## Appendix
 
-# This is the grayscale version that is 100% colorblind friendly and contrast-correct:
-# LTMRdata::SLS %>%
-#   distinct(waterYear = as.factor(as.numeric(format(Date, "%Y")) + (as.numeric(format(Date, "%m")) > 9)),
-#            Station, Survey) %>%
-#   group_by(waterYear, Station, Survey) %>%
-#   count() %>%
-#   group_by(waterYear, Station) %>%
-#   mutate(numSurvey = sum(n)) %>%
-#   {
-#     ggplot(data = ., aes(waterYear, Station, fill = factor(numSurvey, levels = sort(unique(.$numSurvey))))) +
-#       geom_tile(color = "grey50") +
-#       geom_text(aes(label = numSurvey), color = "#FFFFFF", size = 5.5) +
-#       scale_y_discrete(limits = rev) +
-#           scale_fill_manual(values = c("#595959", "#383838", "#1F1F1F", "#000000")) +
-#       labs(title = "Number of surveys per station per water year",
-#            fill = "Number of surveys",
-#            x = "Water Year") +
-#       theme_classic(base_size = 24) +
-#       theme(legend.position = "bottom")
-#   }
+**Species Sampled:** 
+
+```{r species sampled}
+SLS %>% 
+  filter(!Taxa %in% c(NA, "UnID")) %>% 
+  group_by(Taxa) %>% 
+  slice(1) %>% 
+  transmute(CommonName, Taxa, DateFirstID = Date) %>% 
+  arrange(CommonName, Taxa) %>% 
+  kbl(booktabs = T, longtable = T, caption = "The SLS Survey identifies all captured fish, jellyfish, and shrimp species. The date associated with the first identification of each species is provided. There is not been a taxa that is not identified by the survey if captured, although not all taxa are identified to the species level.")
 ```

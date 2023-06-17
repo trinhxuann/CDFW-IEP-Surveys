@@ -1,126 +1,126 @@
-"CommonName","FishCode"
-"California Skate",NA
-"Black Bullhead",18
-"California Tonguefish",76
-"Pacific Halibut",NA
-"Red Shiner",72
-"Fathead Minnow",73
-"Shokihaze Goby",74
-"Tridentiger spp.",75
-"Blue Catfish",7105
-"Unid Flounder",3127
-"Penpoint Gunnel",2826
-"Saddleback Gunnel",2829
-"Monkeyface Prickleback",2775
-"Prickleback spp.",2813
-"Brown Rockfish",96
-"Spotted Bass",77
-"Bluefin Killifish",116
-"Rockfish (unid)",100
-"Longfin Smelt",2
-"Delta Smelt",3
-"Wakasagi",67
-"American Shad",5
-"Threadfin Shad",6
-"Pacific Herring",52
-"White Catfish",8
-"Channel Catfish",9
-"Brown Bullhead",54
-"Yellowfin Goby",10
-"Tidewater Goby",12
-"Arrow Goby",13
-"Chameleon Goby",58
-"Shimofuri Goby",66
-"Bay Goby",59
-"Northern Anchovy",14
-"Chinook Salmon",15
-"Steelhead",55
-"Striped Bass Adult",NA
-"Starry Flounder",19
-"Threespine Stickleback",20
-"White Sturgeon",22
-"Green Sturgeon",23
-"Golden Shiner",25
-"Carp",26
-"Goldfish",27
-"Splittail",28
-"Hardhead",29
-"Sacramento Pikeminnow",30
-"Hitch",57
-"Topsmelt",33
-"Jacksmelt",34
-"Inland Silverside",53
-"Bay Pipefish",35
-"Redear Sunfish",56
-"Green Sunfish",37
-"Bluegill Sunfish",38
-"Largemouth Bass",39
-"White Crappie",40
-"Black Crappie",41
-"Sacramento Perch",42
-"Mosquitofish",31
-"Bigscale Logperch",44
-"Tule Perch",46
-"Shiner Perch",47
-"Pacific Staghorn Sculpin",48
-"Prickly Sculpin",49
-"Plainfin Midshipman",50
-"White Croaker",51
-"Pacific Lamprey",61
-"River Lamprey",62
-"Sacramento Sucker",64
-"Rainwater Killifish",65
-"Unknown",99
-"Smelt (Unid)",1
-"Herring (Unid)",4
-"Catfish (Unid)",7
-"Gobies (Unid)",11
-"Cyprinids (Unid)",24
-"Silversides (Unid)",32
-"Centrarchids (Unid)",36
-"Perches (Unid)",43
-"Surfperches (Unid)",45
-"Sculpins (Unid)",63
-"Lampreys (Unid)",60
-"Cheekspot Goby",70
-"Longjaw Mudsucker",69
-"Smallmouth Bass",68
-"Striped Bass",0
-"Sturgeon (Unid)",21
-"Bat Ray",NA
-"Big Skate",NA
-"Pacific Pompano",NA
-"Pacific Sanddab",NA
-"Pacific Tomcod",NA
-"Leopard Shark",NA
-"Brown Smoothhound",NA
-"California Halibut",78
-"Speckled Sanddab",80
-"Diamond Turbot",NA
-"Palaemon",NA
-"Night Smelt",NA
-"Surf Smelt",NA
-"Whitebait Smelt",NA
-"Walleye Surfperch",NA
-"Pile perch",NA
-"Black Surfperch",NA
-"Spiny Dogfish",NA
-"Sacramento Blackfish",71
-"Sand Sole",NA
-"English Sole",83
-"Flatfish (Unid)",84
-"Rock Sole",NA
-"Wolf Eel",NA
-"Pacific Electric Ray",NA
-"Dwarf Surfperch",NA
-"Grey Smoothhound",NA
-"Lingcod",NA
-"Rubberlip Seaperch",NA
-"Broadnose Sevengill Shark",NA
-"Spotfin Surfperch",NA
-"White Seaperch",NA
-"Striped Bass Adult2",NA
-"Calico Surfperch",NA
-"Redtail Surfperch",NA
-"Barred Surfperch",NA
-"Warmouth",17
+"Common.Name","Genus","Species","Family","Fish.Code","Symbol","TNS.Field","MWT.Species.Code","MWT.Field","NBAView","AdFinPresent","ReleasedAlive","FieldRace","FinalRace"
+"California Skate","Raja","inornata","Rajidae",NA,NA,NA,60,"CALSKATE",FALSE,FALSE,FALSE,FALSE,FALSE
+"Black Bullhead","Ameiurus","melas","Ictaluridae",18,"BLB",NA,68,"BLKBULHD",TRUE,FALSE,FALSE,FALSE,FALSE
+"California Tonguefish","Symphurus","atricauda","Cynoglossidae",76,"CTF",NA,77,"CATONGUE",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Halibut","Hippoglossus","stenolepis","Pleuronectidea",NA,NA,NA,79,"PHALIBUT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Red Shiner","Notropis","lutrensis","Cyprinidae",72,"RSH",NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Fathead Minnow","Pimephales","promelas","Cyprinidae",73,"FHM",NA,1006,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Shokihaze Goby","Tridentiger","barbatus","Gobiidae",74,"SHO",NA,NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Tridentiger spp.","Tridentiger",NA,"gobiidae",75,"TRI",NA,NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Blue Catfish","Ictalurus","furcatus","Ictaluridae",7105,NA,NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Unid Flounder",NA,NA,NA,3127,NA,NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Penpoint Gunnel","Apodichthys","flavidus","Pholidae",2826,NA,NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Saddleback Gunnel","Pholis","ornata","Pholidae",2829,NA,NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Monkeyface Prickleback","Cebidichthys","violaceus","Stichaeidae",2775,NA,NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Prickleback spp.",NA,NA,"Stichaeidae",2813,NA,NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Brown Rockfish","Sebastes","auriculatus","Sebastidae",96,"BRF",NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Spotted Bass","Micropterus","punctulatus","Centrarchidae",77,"SPB",NA,NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Bluefin Killifish",NA,NA,NA,116,NA,NA,NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Rockfish (unid)",NA,NA,NA,100,NA,NA,NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Longfin Smelt","Spirinchus","thaleichthys","Osmeridae",2,"LFS","LGFNSMLT",25,"LNGFSMLT",TRUE,FALSE,FALSE,FALSE,FALSE
+"Delta Smelt","Hypomesus","transpacificus","Osmeridae",3,"DS","DLTASMLT",24,"DLTASMLT",TRUE,FALSE,FALSE,FALSE,FALSE
+"Wakasagi","Hypomesus","nipponensis","Osmeridae",67,"WK","WAKASAGI",93,"WAKASAGI",TRUE,FALSE,FALSE,FALSE,FALSE
+"American Shad","Alosa","sapidissima","Clupeidae",5,"AS","AMERSHAD",19,"AMERSHAD",TRUE,FALSE,FALSE,FALSE,FALSE
+"Threadfin Shad","Dorosoma","petenense","Clupeidae",6,"TFS","THREADFN",20,"TFINSHAD",TRUE,FALSE,FALSE,FALSE,FALSE
+"Pacific Herring","Clupea","pallasi","Clupeidae",52,"PH","PHERRING",16,"PHERRING",FALSE,FALSE,FALSE,FALSE,FALSE
+"White Catfish","Ameiurus","catus","Ictaluridae",8,"WCF","WHTCATFS",5,"WHITECAT",TRUE,FALSE,FALSE,FALSE,FALSE
+"Channel Catfish","Ictalurus","punctatus","Ictaluridae",9,"CCF","CHANLCAT",4,"CHANLCAT",TRUE,FALSE,FALSE,FALSE,FALSE
+"Brown Bullhead","Ameiurus","nebulosus","Ictaluridae",54,"BRB","BRNBULLH",69,"BRNBULHD",TRUE,FALSE,FALSE,FALSE,FALSE
+"Yellowfin Goby","Acanthogobius","flavimanus","Gobiidae",10,"YFG","YELFGOBY",42,"YELFGOBY",TRUE,FALSE,FALSE,FALSE,FALSE
+"Tidewater Goby","Eucyclogobius","newberryi","Gobiidae",12,"TWG","TIDEGOBY",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Arrow Goby","Clevelandia","ios","Gobiidae",13,"AG","AROWGOBY",76,"AROWGOBY",FALSE,FALSE,FALSE,FALSE,FALSE
+"Chameleon Goby","Tridentiger","trigonocephalus","Gobiidae",58,"CG","CAMLGOBY",92,"CAMLGOBY",TRUE,FALSE,FALSE,FALSE,FALSE
+"Shimofuri Goby","Tridentiger","bifasciatus","Gobiidae",66,"SG","SHIMGOBY",95,"SHIMGOBY",TRUE,FALSE,FALSE,FALSE,FALSE
+"Bay Goby","Lepidogobius","lepidus","Gobiidae",59,"BG","BAYGOBY",74,"BAYGOBY",FALSE,FALSE,FALSE,FALSE,FALSE
+"Northern Anchovy","Engraulis","mordax","Engraulidae",14,"NA","NANCHOVY",13,"NANCHOVY",FALSE,FALSE,FALSE,FALSE,FALSE
+"Chinook Salmon","Oncorhynchus","tshawytscha","Salmonidae",15,"CS","CHINSALM",9,"CHINSALM",TRUE,TRUE,TRUE,TRUE,TRUE
+"Steelhead","Oncorhynchus","mykiss","Salmonidae",55,"STH",NA,32,"STEELHED",TRUE,TRUE,TRUE,TRUE,TRUE
+"Striped Bass Adult","Morone","saxatilis","Moronidae",NA,"SB",NA,34,"STPBASS1",FALSE,FALSE,FALSE,FALSE,FALSE
+"Starry Flounder","Platichthys","stellatus","Pleuronectidae",19,"STF","STARYFLD",31,"STRFLNDR",TRUE,FALSE,FALSE,FALSE,FALSE
+"Threespine Stickleback","Gasterosteus","aculeatus","Gasterosteidae",20,"STB","STICKLEB",38,"STCKL3SP",TRUE,FALSE,FALSE,FALSE,FALSE
+"White Sturgeon","Acipenser","transmontanus","Acipenseridae",22,"WST","WHTSTURG",37,"WHTSTURG",TRUE,FALSE,FALSE,FALSE,FALSE
+"Green Sturgeon","Acipenser","medirostrus","Acipenseridae",23,"GST","GRNSTURG",36,"GRNSTURG",TRUE,FALSE,FALSE,FALSE,FALSE
+"Golden Shiner","Notemigonus","crysoleucas","Cyprinidae",25,"GSH","GOLDSHNR",65,"GOLDSHNR",TRUE,FALSE,FALSE,FALSE,FALSE
+"Carp","Cyprinus","carpio","Cyprinidae",26,"CP","CARP",3,"CARP",TRUE,FALSE,FALSE,FALSE,FALSE
+"Goldfish","Carassius","auratus","Cyprinidae",27,"GF","GOLDFISH",64,"GOLDFISH",TRUE,FALSE,FALSE,FALSE,FALSE
+"Splittail","Pogonichthys","macrolepidotus","Cyprinidae",28,"ST","SPLITAIL",29,"SPLITAIL",TRUE,FALSE,FALSE,FALSE,FALSE
+"Hardhead","Mylopharodon","conocephalus","Cyprinidae",29,"HH","HARDHEAD",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Sacramento Pikeminnow","Ptychocheilus","grandis","Cyprinidae",30,"SQ","SACSQUAW",63,"SACSQUAW",TRUE,FALSE,FALSE,FALSE,FALSE
+"Hitch","Lavinia","exilicauda","Cyprinidae",57,"HIT","HITCH",61,"HITCH",TRUE,FALSE,FALSE,FALSE,FALSE
+"Topsmelt","Atherinops","affinis","Atherinopsidae",33,"TSM","TOPSMELT",39,"TOPSMELT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Jacksmelt","Atherinopsis","californiensis","Atherinopsidae",34,"JS","JACKSMLT",8,"JACKSMLT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Inland Silverside","Menidia","beryllina","Atherinopsidae",53,"ISS","INLDSLVR",12,"INLSLVER",TRUE,FALSE,FALSE,FALSE,FALSE
+"Bay Pipefish","Syngnathus","leptorhynchus","Syngnathidae",35,"BPF","BAYPIPE",71,"BAYPIPEF",FALSE,FALSE,FALSE,FALSE,FALSE
+"Redear Sunfish","Lepomis","microlophus","Centrarchidae",56,"RES",NA,NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Green Sunfish","Lepomis","cyanellus","Centrarchidae",37,"GSF","GRNSUNF",53,"GRNSNFSH",TRUE,FALSE,FALSE,FALSE,FALSE
+"Bluegill Sunfish","Lepomis","macrochirus","Centrarchidae",38,"BGS","BLUEGILL",52,"BLUEGILL",TRUE,FALSE,FALSE,FALSE,FALSE
+"Largemouth Bass","Micropterus","salmoides","Centrarchidae",39,"LMB","LRGMBASS",55,"LMTHBASS",TRUE,FALSE,FALSE,FALSE,FALSE
+"White Crappie","Pomoxis","annularis","Centrarchidae",40,"WC","WHTCRAPP",7,"WHTCRAPP",TRUE,FALSE,FALSE,FALSE,FALSE
+"Black Crappie","Pomoxis","nigromaculatus","Centrarchidae",41,"BC","BLKCRAP",6,"BLKCRAPP",TRUE,FALSE,FALSE,FALSE,FALSE
+"Sacramento Perch","Archoplites","interruptus","Centrarchidae",42,"SP","SACPERCH",51,"SACPERCH",TRUE,FALSE,FALSE,FALSE,FALSE
+"Mosquitofish","Gambusia","affinis","Poeciliidae",31,"GAM","MOSQUITO",70,"MOSQUITO",TRUE,FALSE,FALSE,FALSE,FALSE
+"Bigscale Logperch","Percina","macrolepida","Percidae",44,"BLP","LOGPERCH",72,"BSCALELG",TRUE,FALSE,FALSE,FALSE,FALSE
+"Tule Perch","Hysterocarpus","traski","Embiotocidae",46,"TP","TULEPRCH",40,"TULEPRCH",TRUE,FALSE,FALSE,FALSE,FALSE
+"Shiner Perch","Cymatogaster","aggregata","Embiotocidae",47,"SHP","SHNRPRCH",21,"SHNRPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Staghorn Sculpin","Leptocottus","armatus","Cottidae",48,"SSC","STAGHORN",30,"PSTGSCLP",FALSE,FALSE,FALSE,FALSE,FALSE
+"Prickly Sculpin","Cottus","asper","Cottidae",49,"PSC","PRKSCULP",73,"PRCKSCUL",TRUE,FALSE,FALSE,FALSE,FALSE
+"Plainfin Midshipman","Porichthys","notatus","Batrachoididae",50,"PFM","PLNMIDSH",14,"PMIDSHIP",FALSE,FALSE,FALSE,FALSE,FALSE
+"White Croaker","Genyonemus","lineatus","Sciaenidae",51,"WCR","WHTCROAK",41,"WHTCROAK",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Lamprey","Lampetra","tridentata","Petromyzontidae",61,"PL","PACLAMP",10,"PLAMPREY",FALSE,FALSE,FALSE,FALSE,FALSE
+"River Lamprey","Lampetra","ayresi","Petromyzontidae",62,"RL","RIVRLAMP",11,"RLAMPREY",TRUE,FALSE,FALSE,FALSE,FALSE
+"Sacramento Sucker","Catostomus","occidentalis","Catostomidae",64,"SUC","SACSUCKR",66,"SACSUCKR",TRUE,FALSE,FALSE,FALSE,FALSE
+"Rainwater Killifish","Lucania","parva","Fundulidae",65,"RK","RAINKILL",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Unknown",NA,NA,"Unknown",99,"UNK","UNKNOWN",NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Smelt (Unid)",NA,NA,"Osmeridae",1,"OSM","SMELT",88,"SMLTFMLY",TRUE,FALSE,FALSE,FALSE,FALSE
+"Herring (Unid)",NA,NA,"Clupeidae",4,"CLU","SHADFMLY",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Catfish (Unid)",NA,NA,"Ictaluridae",7,"ICT","CATFISH",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Gobies (Unid)",NA,NA,"Gobiidae",11,"GOB","GOBYFAML",1001,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Cyprinids (Unid)",NA,NA,"Cyprinidae",24,"CYP","MINNOWS",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Silversides (Unid)",NA,NA,"Atherinopsidae",32,"ATH","SLVESIDF",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Centrarchids (Unid)",NA,NA,"Centrarchidae",36,"CNT","SUNFISHF",1002,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Perches (Unid)",NA,NA,"Percidae",43,"PER",NA,NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Surfperches (Unid)",NA,NA,"Embiotocidae",45,"EMB","SURFPRCH",NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Sculpins (Unid)",NA,NA,"Cottidae",63,"COT","SCULPINF",1003,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Lampreys (Unid)",NA,NA,"Petromyzontidae",60,"PET","LAMPREYF",1004,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Cheekspot Goby","Ilypnus","gilberti","Gobiidae",70,"CSG","CHEKGOBY",75,"CHKSGOBY",FALSE,FALSE,FALSE,FALSE,FALSE
+"Longjaw Mudsucker","Gillichthys","mirabilis","Gobiidae",69,"LJM","LNGJAWMD",NA,NA,FALSE,FALSE,FALSE,FALSE,FALSE
+"Smallmouth Bass","Micropterus","dolomieu","Centrarchidae",68,"SMB","SMLMBASS",94,"SMTHBASS",TRUE,FALSE,FALSE,FALSE,FALSE
+"Striped Bass","Morone","saxatilis","Moronidae",0,"SB0","STPBASS0",33,"STPBASS0",TRUE,FALSE,FALSE,FALSE,FALSE
+"Sturgeon (Unid)",NA,NA,"Acipenseridae",21,"ACI","STURGFMY",NA,NA,TRUE,FALSE,FALSE,FALSE,FALSE
+"Bat Ray","Myliobatis","californica","Myliobatididae",NA,NA,NA,1,"BATRAY",FALSE,FALSE,FALSE,FALSE,FALSE
+"Big Skate","Raja","binoculata","Rajidae",NA,NA,NA,2,"BIGSKATE",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Pompano","Peprilus","simillimus","Stromateidae",NA,NA,NA,15,"PBUTTER",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Sanddab","Citharichthys","sordidus","Paralichthyidae",NA,NA,NA,17,"PSANDAB",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Tomcod","Microgadus","proximus","Gadidae",NA,NA,NA,18,"PTOMCOD",FALSE,FALSE,FALSE,FALSE,FALSE
+"Leopard Shark","Triakis","semifasciata","Triakidae",NA,NA,NA,58,"LEOPSHRK",FALSE,FALSE,FALSE,FALSE,FALSE
+"Brown Smoothhound","Mustelus","henlei","Triakidae",NA,NA,NA,59,"BRNSMHND",FALSE,FALSE,FALSE,FALSE,FALSE
+"California Halibut","Paralichthys","californicus","Paralichthyidae",78,NA,NA,78,"CHALIBUT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Speckled Sanddab","Citharichthys","stigmaeus","Paralichthyidae",80,NA,NA,80,"SPKSANDB",FALSE,FALSE,FALSE,FALSE,FALSE
+"Diamond Turbot","Hypsopsetta","guttulata","Pleuronectidae",NA,NA,NA,82,"DIATURBT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Palaemon","Palaemon","macrodactylus","Caridae",NA,NA,NA,23,"PALAEMON",FALSE,FALSE,FALSE,FALSE,FALSE
+"Night Smelt","Spirinchus","starski","Osmeridae",NA,NA,NA,26,"NGHTSMLT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Surf Smelt","Hypomesus","pretiosis","Osmeridae",NA,NA,NA,27,"SURFSMLT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Whitebait Smelt","Allosmerus","elongatus","Osmeridae",NA,NA,NA,28,"WBATSMLT",FALSE,FALSE,FALSE,FALSE,FALSE
+"Walleye Surfperch","Hyperprosopon","ellipticum","Embiotocidae",NA,NA,NA,43,"WALSPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pile perch","Rhacochilas","vacca","Embiotocidae",NA,NA,NA,47,"PILEPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Black Surfperch","Embiotoca","jacksoni","Embiotocidae",NA,NA,NA,49,"BLKPERCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Spiny Dogfish","Squalus","acantias","Squalidae",NA,NA,NA,57,"SPINYDOG",FALSE,FALSE,FALSE,FALSE,FALSE
+"Sacramento Blackfish","Orthodon","microlepidotus","Cyprinidae",71,"SBF",NA,62,"SACBLAKF",FALSE,FALSE,FALSE,FALSE,FALSE
+"Sand Sole","Psettichthys","melanostictus","Pleuronectidae",NA,NA,NA,81,"SANDSOLE",FALSE,FALSE,FALSE,FALSE,FALSE
+"English Sole","Pleuronectes","vetulus","Pleuronectidae",83,NA,NA,83,"ENGLSOLE",FALSE,FALSE,FALSE,FALSE,FALSE
+"Flatfish (Unid)",NA,NA,NA,84,NA,NA,84,"FLATFISH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Rock Sole","Lepidopsetta","bilineata","Pleuronectidae",NA,NA,NA,85,"ROCKSOLE",FALSE,FALSE,FALSE,FALSE,FALSE
+"Wolf Eel","Anarrhichthys","ocellatus","Anarhichadidae",NA,NA,NA,87,"WOLFEEL",FALSE,FALSE,FALSE,FALSE,FALSE
+"Pacific Electric Ray","Torpedo","californica","Torpedinidae",NA,NA,NA,91,"PACELRAY",FALSE,FALSE,FALSE,FALSE,FALSE
+"Dwarf Surfperch","Micrometrus","minimus","Embiotocidae",NA,NA,NA,50,"DWFPERCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Grey Smoothhound","Mustelus","californica","Triakidae",NA,NA,NA,67,"GRYSMHND",FALSE,FALSE,FALSE,FALSE,FALSE
+"Lingcod","Ophiodon","elongatus","Hexagrammidae",NA,NA,NA,86,"LINGCOD",FALSE,FALSE,FALSE,FALSE,FALSE
+"Rubberlip Seaperch","Rhacochilus","toxotes","Embiotocidae",NA,NA,NA,44,"RUBLPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Broadnose Sevengill Shark","Notorynchus","cepodianus","Hexanchidae",NA,NA,NA,56,"SEVNGSHK",FALSE,FALSE,FALSE,FALSE,FALSE
+"Spotfin Surfperch","Hyperprosopon","anale","Embiotocidae",NA,NA,NA,89,"SPTFPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"White Seaperch","Phanerodon","furcatus","Embiotocidae",NA,NA,NA,90,"WHTSPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Striped Bass Adult2","Morone","saxatilis","Moronidae",NA,NA,NA,35,"STPBASS2",FALSE,FALSE,FALSE,FALSE,FALSE
+"Calico Surfperch","Amphistichus","koelzi","Embiotocidae",NA,NA,NA,45,"CALSPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Redtail Surfperch","Amphistichus","rhodoterus","Embiotocidae",NA,NA,NA,46,"RTLSPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Barred Surfperch","Amphistichus","argenteus","Embiotocidae",NA,NA,NA,48,"BRDSPRCH",FALSE,FALSE,FALSE,FALSE,FALSE
+"Warmouth","Lepomis","gulosus","Centrarchidae",17,"WAM",NA,54,"WARMOUTH",TRUE,FALSE,FALSE,FALSE,FALSE

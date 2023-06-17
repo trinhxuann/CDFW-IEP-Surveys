@@ -1,0 +1,91 @@
+---
+title: "SLS QAQC Instructions"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output: 
+  html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, echo=F}
+startTime <- Sys.time()
+knitr::opts_chunk$set(dpi=320, fig.width=15, fig.height=10, warning=FALSE, message=F, 
+                      dev = "CairoPNG",
+                      dev.args = list(pointsize = 13), echo = T)
+```
+
+## Purpose
+
+This document lays out the steps required to run the QAQC process for the Smelt Larval Survey (SLS) in R.
+
+## Prerequisites
+
+Follow these instructions if you are starting from scratch:
+
+1. Install R (at least 32 bit R, [4.1.3 is the last supported](https://cran.r-project.org/bin/windows/base/old/4.1.3)), RStudio, and Github Desktop. These software can be easily searchable and can be installed without needing IT approval.
+2. Open your ports, set up a Github account and connect Git to RStudio, and install LaTeX. You can refer to the relevant sections in "SetupGuide.docx" found in the repository in step 3 for additional information on these steps.
+3. Required files are hosted on this Github repository: https://github.com/trinhxuann/CDFW-IEP-Surveys
+4. Clone the repository onto your computer. In Github Desktop, go to File -> Clone Repository -> URL -> paste in "https://github.com/trinhxuann/CDFW-IEP-Surveys.git". You should note where the files will be saved on your computer listed under "Local path".
+5. Ensure you are working off "main" branch of the repository. This can be seen under "Current branch" in the Github Desktop app.
+6. The remaining workflow occurs in RStudio.
+7. Ensure you are working in 32-bit R. 
+8. Ensure you have all required data packages installed in R. A [list][R packages Required] is provided at the end of this document, but it is likely best to install the packages as required when you are running the scripts and an error is given.
+
+## General workflow
+
+### QAQC queries
+
+1. Connect to the Access database, pull the required data tables, and save those data files as flat files and an rds file.
+    + This is done by the `pullAccessDF()` function within `readAccess.R` in the `R` folder
+    + The function leans on code within the `SLS.R` script to do this work
+    + The flat files will be used to upload to the EDI repository as part of the package
+    + The rds file will be used within the `SLS_QAQC.R` file to bring the tables of interest to QAQC
+2. Run QAQC procedures developed for the SLS. These are a mix of queries developed in Access used historically and newly created ones specific to this R workflow.
+    + Run all lines of code within the `SLS_QAQC.R` file. This file is in the `data-raw` folder. One way to do this quickly is `Ctrl + Shift + Enter`
+3. Collate all outliers into an Excel file with each tab being a QAQC query of interest. The ES in charge should explore these outliers and determine if these points are truly outliers or not, logging the decisions within the Excel file for record keeping.
+    + The last line of the `SLS_QAQC.R` file will write this file. It is hosted within `data-raw/Outliers/SLS` with a timestamp in its name.
+4. Apply changes to identified outliers directly to the backend Access database. This is a manual step. Rerun this entire workflow to ensure that all outliers of interest have been accounted for.
+
+### Integrated dataset
+
+5. Integrate all data tables into an integrated data table for publication.
+    + Done by the `SLSIntegrate.R` file in the `R` folder. Run all lines of code. A `SLS.csv` file will be created in `data-raw/SLS` that is the integrated dataset.
+    
+### Metadata documentation
+
+6. Update the metadata documentation for the SLS
+    + Open the `SLS_Metadata.Rmd` (markdown) file in the `data-raw` file
+    + Update the documents as necessary, e.g., information on project lead, protocol changes, etc.
+    + Update relevant protocol changes in the `yearlyChanges_SLS.csv` file in the `data-raw` folder for the new year
+    + "Knit" the markdown file. There is a button for this or hit `Ctrl + Shift + k`. This will output 
+    
+### Publication
+7. Publish to EDI and FTP.
+    + EDI: all flat files, rds file, `SLSIntegrateEDI.R` script, and the metadata pdf document
+    + FTP: Tier3 Access database file
+
+## R packages required 
+
+```{r, eval=F}
+# Data manipulation packages
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(tidyr)
+# Data acquisition packages
+library(readr)
+library(httr)
+library(rvest)
+library(devtools)
+# Database packages
+library(DBI)
+library(odbc)
+# Mapping packages
+library(leaflet)
+library(geosphere)
+library(mapview)
+# Mapview requires phantomJS to be installed. You can do so via:
+webshot::install_phantomjs()
+# Data calculation packages
+library(wql)
+```

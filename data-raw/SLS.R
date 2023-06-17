@@ -258,14 +258,13 @@ readSLSAccess <- function(file = Args[1],
   if (returnDF) {
     
     cat("\nReturning dataframe only \n")
-    setTxtProgressBar(pb, 5)
+    setTxtProgressBar(pb, 4)
     close(pb)
     endTime <- Sys.time()
     
     cat("Connection time: ", (connectionTime - startTime)/60, 
         "; pull time: ", (pullTime - connectionTime)/60,
-        "; float time: ", (floatTime - pullTime)/60,
-        "; overall time: ", (connectionTime - floatTime)/60, " seconds.", fill = T)
+        "; overall time: ", (connectionTime - pullTime)/60, " seconds.", fill = T)
   
     return(SLSTables)
     

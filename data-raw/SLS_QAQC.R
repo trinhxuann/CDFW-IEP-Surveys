@@ -4,15 +4,15 @@
 
 # libraries ---------------------------------------------------------------
 
-library(dplyr)
+library(dplyr, warn.conflicts = F)
 library(readr)
 library(tidyr)
-library(lubridate)
+library(lubridate, warn.conflicts = F)
 library(stringr)
 library(leaflet)
 library(geosphere)
 library(httr)
-library(rvest)
+library(rvest, warn.conflicts = F)
 
 # Reading in the base tables ----------------------------------------------
 # This script should be ran after creating the databases script. I will assume
@@ -35,9 +35,9 @@ outliers <- list()
 yearOfInterest <- year(today()) + (month(today()) > 11 & max(data$WaterInfo$Date) > as.Date(paste0(year(today()), "-12-01")))
 
 # Make sure that the file names/table names are the same as what will be called here. They NEED to be:
-# "Catch", "Lengths", "MeterCorrections", "Station_Lookup", "TowInfo", and "WaterInfo"
+# "Catch", "Lengths", "MeterCorrections", "Station_Lookup", "TowInfo", "FishCodes", and "WaterInfo"
 # Order of names listed in expectedNames variable does not matter
-expectedNames <- c("Catch", "Lengths", "MeterCorrections", "TowInfo", "WaterInfo", "Station_Lookup")
+expectedNames <- c("Catch", "Lengths", "MeterCorrections", "TowInfo", "WaterInfo", "Station_Lookup", "FishCodes")
 
 # This is a simple check to stop the script (if the user opt to run the entire script in its entirety)
 if (!all(names(data) %in% expectedNames)) {
@@ -136,8 +136,8 @@ gpsOutlier <- function(df, d = 0.5, station = NULL, year = NULL, survey = NULL,
       filter(group %in% "TheoreticalCoords", Station == x)
     
     if (nrow(theoretical) > 0 & nrow(tows) > 0) {
-     
-      df <- tows %>% 
+    
+      df <- tows %>%
         mutate(longTheoretical = theoretical$StartLong,
                latTheoretical = theoretical$StartLat,
                distance = distVincentyEllipsoid(cbind(StartLong, StartLat),
@@ -162,9 +162,14 @@ gpsOutlier <- function(df, d = 0.5, station = NULL, year = NULL, survey = NULL,
                 Comments.Station,
                 group, StartLat, StartLong, longTheoretical, latTheoretical,
                 distance, outlier, NAflag)
-  } else plotGPS(df = fin)
+  } else {
+    message("Plotting all outlying coordinates.")
+    plotGPS(df = fin)
+  }
 }
 
+# # Leave returnDF as F to plot just the outlying points
+# gpsOutlier(GPSDF, d = 0.5, year = yearOfInterest)
 outliers$GPS <- gpsOutlier(GPSDF, d = 0.5, year = yearOfInterest, returnDF = T)
 
 # Cable outliers ----------------------------------------------------------

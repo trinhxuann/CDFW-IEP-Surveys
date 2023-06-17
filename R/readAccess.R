@@ -81,7 +81,7 @@ pullAccessDF <- function(script = c("SLS.R", "20mm", "SKT"),
 pullAccessDF(script = "SLS.R",
              file = "U:\\NativeFish\\SmeltData\\DS-DATA\\SLS_Query.accdb",
              tablesReturned = c("Catch", "Lengths", "MeterCorrections",
-                                "TowInfo", "WaterInfo", "Station_Lookup"))
+                                "TowInfo", "WaterInfo", "Station_Lookup", "FishCodes"))
 
 
 

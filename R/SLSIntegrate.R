@@ -105,11 +105,11 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
                                                  Survey = readr::col_integer(),
                                                  Date = readr::col_date("%Y-%m-%d"),
                                                  Station = readr::col_character(),
-                                                 Temp = readr::col_double(),
+                                                 TopTemp = readr::col_double(),
                                                  TopEC = readr::col_integer(),
                                                  BottomEC = readr::col_integer(),
                                                  Secchi = readr::col_integer(),
-                                                 Turbidity = readr::col_double(),
+                                                 FNU = readr::col_double(),
                                                  Comments = readr::col_character()
                                                )
     )
@@ -122,6 +122,16 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
                                                       Description = readr::col_character(),
                                                       Lat = readr::col_character(),
                                                       Long = readr::col_character())) 
+    
+    SLSTables$FishCodes <- readr::read_delim(file.path("data-raw", "SLS", "FishCodes.csv"), delim = ",",
+                                             col_types = 
+                                               readr::cols_only(
+                                                 Common.Name = readr::col_character(),
+                                                 Genus = readr::col_character(),
+                                                 Species = readr::col_character(),
+                                                 Family = readr::col_character(),
+                                                 Fish.Code = readr::col_double(),
+                                               ))
     
     # Were there any problems with the reading process?
     if (sum(sapply(SLSTables, function(x) nrow(readr::problems(x)))) > 0) {
@@ -141,7 +151,7 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
       Sal_surf = wql::ec2pss(TopEC/1000, t = 25),
       Sal_bot = wql::ec2pss(BottomEC/1000, t = 25),
       # This is to take care of how the floats are read between Access and readr methods...
-      Temp_surf = round(Temp, 2)) %>% 
+      Temp_surf = round(TopTemp, 2)) %>% 
     dplyr::rename(Notes_env = Comments)
   
   towInfo <- SLSTables$TowInfo %>%
@@ -198,6 +208,13 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
     dplyr::group_by(Date, Station, Tow, FishCode) %>%
     dplyr::mutate(TotalLengthMeasured = sum(LengthFrequency)) %>%
     dplyr::ungroup()
+  
+  fishCodes <- SLSTables$FishCodes %>% 
+    dplyr::filter(!is.na(Fish.Code)) %>% 
+    dplyr::transmute(CommonName = Common.Name,
+                     Taxa = paste(Genus, Species),
+                     FishCode = Fish.Code) %>% 
+    dplyr::mutate(Taxa = ifelse(Taxa == "NA NA", NA, Taxa))
   
   # Joining the tables ------------------------------------------------------
   
@@ -262,7 +279,7 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
   
   joinCheckSteps$waterTowCatchWater <- compareDF(waterInfo, waterTowCatchJoin)
   joinCheckSteps$waterTowCatchTow <- compareDF(towInfo, waterTowCatchJoin)
-  compareDF(catch, waterTowCatchJoin)
+  # compareDF(catch, waterTowCatchJoin)
   # Check catch (+X NAs)
   joinCheckSteps$waterTowCatchCatch <- compareDF(catch, waterTowCatchJoin %>% 
                                                    dplyr::filter(!is.na(Catch)))
@@ -280,8 +297,8 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
   
   joinCheckSteps$waterTowCatchLengthWater <- compareDF(waterInfo, waterTowCatchLengthJoin)
   joinCheckSteps$waterTowCatchLengthTow <- compareDF(towInfo, waterTowCatchLengthJoin)
-  compareDF(catch, waterTowCatchLengthJoin)
-  compareDF(lengths, waterTowCatchLengthJoin)
+  # compareDF(catch, waterTowCatchLengthJoin)
+  # compareDF(lengths, waterTowCatchLengthJoin)
   # Similar problem from catch propagated
   joinCheckSteps$waterTowCatchLengthCatch <- compareDF(catch, waterTowCatchLengthJoin %>% 
                                                          dplyr::filter(!is.na(Catch)))
@@ -295,11 +312,12 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
   # Now the last joining steps, to species code and station #
   # This step should never add or delete rows given that it's a left_join only
   finJoin <- waterTowCatchLengthJoin %>% 
-    dplyr::left_join(LTMRdata::Species %>%
-                       dplyr::select(TMM_Code,
-                                     Taxa) %>%
-                       dplyr::filter(!is.na(TMM_Code)),
-                     by = c("FishCode" = "TMM_Code")) %>%
+    dplyr::left_join(fishCodes, by = "FishCode") %>% 
+    # dplyr::left_join(LTMRdata::Species %>%
+    #                    dplyr::select(TMM_Code,
+    #                                  Taxa, CommonName) %>%
+    #                    dplyr::filter(!is.na(TMM_Code)),
+    #                  by = c("FishCode" = "TMM_Code")) %>%
     dplyr::left_join(stationLookup,
                      by = "Station")
   
@@ -383,9 +401,9 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
       # Removing CBMeterSerial, CBMeterStart, CBMeterEnd, CBMeterCheck as CB not ran on the SLS
       dplyr::select(Source, Station, Latitude, Longitude,
                     Date, Datetime, Survey, Depth, SampleID, Method,
-                    Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, Turbidity, Tow_volume,
+                    Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, FNU, Tow_volume,
                     Cable_length = CableOut, Tow_duration = Duration,
-                    Taxa, Length, Count, Length_NA_flag,
+                    Taxa, CommonName, Length, Count, Length_NA_flag,
                     Notes_tow, Notes_flowmeter = Notes) %>% 
       data.frame()
   }
@@ -403,7 +421,7 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
     # Length = filled with NAs if missing
     # Count = filled with 0
     dplyr::group_by(Source, Station, Latitude, Longitude, Date, Datetime, Survey, Depth,
-                    SampleID, Method, Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, Turbidity,
+                    SampleID, Method, Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, FNU,
                     Tow_volume, Cable_length, Tow_duration, Length_NA_flag,
                     Notes_tow, Notes_flowmeter) %>%
     # Fill in rows for all Station, Date, Datetime, Survey, Method
@@ -435,6 +453,8 @@ SLSIntegrate <- function(filePath = NULL, fillZeroes = F) {
 }
 
 SLS <- SLSIntegrate(filePath = file.path("data-raw", "SLS"))
+yearOfInterest <- year(today()) + (month(today()) > 11 & 
+                                     max(SLS$Date) > as.Date(paste0(year(today()), "-12-01")))
 SLS <- SLS %>% 
-  filter(Date < as.Date("2021-12-01"))
+  filter(Date < as.Date(paste0(yearOfInterest, "-12-01")))
 write.csv(SLS, file = file.path("data-raw", "SLS", "SLS.csv"), row.names = F)
