@@ -68,25 +68,29 @@ Address: 2109 Arch Airport Rd Suite 100, Stockton, CA 95206
 
 Phone: (209) 234-3420
 
-**Program manager:** Lauren Damon, [Lauren.Damon@Wildlife.ca.gov](mailto:Lauren.Damon@Wildlife.ca.gov)
+**Program manager:** James Hobbs, [James.Hobbs@Wildlife.ca.gov](mailto:James.Hobbs@Wildlife.ca.gov)
 
-**Project lead:** Vanessa Mora, [Vanessa.Mora@Wildlife.ca.gov](mailto:Vanessa.Mora@Wildlife.ca.gov)
+**Project leads:** Vanessa Mora, [Vanessa.Mora@Wildlife.ca.gov](mailto:Vanessa.Mora@Wildlife.ca.gov)
+
+  Jennifer Oceguera Zavala, [Jennifer.Oceguerazavala@wildlife.ca.gov](mailto:Jennifer.Oceguerazavala@wildlife.ca.gov)
+
+  Jessica A. Jimenez, [Jessica.Jimenez@wildlife.ca.gov](mailto:Jessica.Jimenez@wildlife.ca.gov)
 
 ## Study Overview
 
-**Purpose/Objective:** Monitor and provide information on larval Longfin Smelt abundance and distribution in the upper San Francisco Estuary. Conduct larval fish surveys to determine the timing, distribution, and abundance of Longfin Smelt larvae. Help estimate larval Longfin Smelt fish losses and determine the magnitude of entrainment of larval Longfin Smelt at the CVP (Central Valley Project) and SWP (State Water Project) intakes.
+**Purpose/Objective:** Monitor and provide information on larval Longfin Smelt (*Spirinchus thaleichthys*) abundance and distribution in the upper San Francisco Estuary. Conduct larval fish surveys to determine the timing, distribution, and abundance of Longfin Smelt larvae. Help estimate larval Longfin Smelt fish losses and determine the magnitude of entrainment of larval Longfin Smelt at the CVP (Central Valley Project) and SWP (State Water Project) intakes.
 
-**Data collected:** Surface water temperature (°C), surface and bottom electro-conductivity (EC, $\mu$S/cm, normalized at 25 °C), Secchi depth (cm), surface water turbidity (NTU), water volume (m$^3$), tidal stage, and identification, counts, and lengths (mm, fork lengths or total length for species without a forked tail) of fishes to the lowest possible taxon.
+**Data collected:** Surface water temperature (°C), surface and bottom electro-conductivity (EC, $\mu$S/cm, normalized at 25 °C), Secchi depth (cm), surface water turbidity (NTU, FNU), water volume (m$^3$), tidal stage, start and end tow coordinates (DMS). Fish are identified to the lowest possible taxonomic level, enumerated, and measured (mm) to fork length when possible or total length when the fork in the caudal fin is not present.
 
-**Geographic range of work:** Lower Napa River to the city of Napa, eastern Carquinez Strait upstream throughout Suisun Bay; San Joaquin River to Stockton, Old and Middle Rivers in the south Delta to West Canal; Sacramento River to Rio Vista; Cache Slough from Rio Vista to Shag Slough; 1 station at the mouth of the Sacramento Deep-water Ship Channel.
+**Geographic range of work:** Lower Napa River to the city of Napa, San Pablo Bay upstream throughout Suisun Bay; San Joaquin River to Stockton, Old and Middle Rivers in the south Delta to West Canal; Sacramento River to Rio Vista; Cache Slough from Rio Vista to Shag Slough; 1 station at the mouth of the Sacramento Deep-water Ship Channel.
 
 ```{r, overall map, echo = F, results='asis'}
-specialStations <- data.frame(Station = c(716, 809, 812, 815, 901, 902, 906, 910, 912, 914, 915, 918, 919),
-                              Status = c("Barker ITP Station", rep("SWP ITP Criteria Stations", 12)))
+specialStations <- data.frame(Station = c(716, 809, 812, 815, 901, 902, 906, 910, 912, 914, 915, 918, 919, 340, 342, 343, 344, 345, 346, 347, 348, 349, 404, 401, 338, 329, 335, 328, 327, 315, 306, 308, 311, 322, 330, 323, 336),
+                              Status = c("Barker ITP Station", rep("SWP ITP Criteria Stations", 12), rep("Napa River Stations", 9), rep("San Pablo Expansion Stations", 15)))
 
 # To color the stations on the map accordingly
 # pal <- colorFactor(c("#e41a1c", "#3D8B3A", "#984ea3"), domain = c(specialStations$Status, "SLS Stations"))
-pal <- colorFactor(c("#3B4992FF", "#EE0000FF", "#008B45FF"), domain = c(specialStations$Status, "SLS Stations"))
+pal <- colorFactor(c("#32CD32", "#EE0000FF", "#008B45FF","#F87217" , "#2B1B17" ), domain = c(specialStations$Status, "SLS Stations"))
 
 mapDF <- read.csv(file.path("SLS", "Station_Lookup.csv")) %>%
             mutate(LatD = sapply(strsplit(.$Lat, "\\s"), "[", 1),
@@ -102,7 +106,7 @@ mapDF <- read.csv(file.path("SLS", "Station_Lookup.csv")) %>%
                         group = "TheoreticalCoords") %>%
             left_join(specialStations, by = "Station") %>%
             mutate(Status = factor(ifelse(is.na(Status), "SLS Stations", Status),
-                                   levels = c("SLS Stations", "Barker ITP Station", "SWP ITP Criteria Stations")),
+                                   levels = c("SLS Stations", "Barker ITP Station", "SWP ITP Criteria Stations", "Napa River Stations", "San Pablo Expansion Stations")),
                    offsetX = case_when(Station %in% 723 ~ c(-22),
                                   TRUE ~ c(22)),
            offsetY = case_when(Station %in% 723 ~ c(0),
@@ -151,11 +155,11 @@ m %>%
 
 ## Field Sampling Methods
 
-**Net:** The SLS samples using a cone shaped net with a length of 3.35 meters (m), a mouth area of 0.37 m$^2$, and a 505 $\mu$m NitexR mesh. The mesh size was altered prior to the 2014 season to 500 $\mu$m NitexR, when the original mesh size was no longer available and new nets were purchased (see 2014 changes below). These new nets were incorporated as old nets became unusable. The net is mounted on a fixed metal tube frame with skis and is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar attached to the end of the net. A General Oceanics flowmeter is mounted across the net’s mouth to estimate the water volume filtered during each tow. Prior to 2015, all flowmeters were calibrated at UC Davis before the start of the season to determine its calibration factor required for water volume calculations. After 2015, the calibration flume at UC Davis became inoperable, and the meters were sent to General Oceanics for refurbishing before each field season and the factory calibration factor used. Since 2019, meters are inspected at the end of every field season and are replaced with new units if refurbishing is required to support the continued use of the factory calibration factor.
+**Net:** The SLS samples using a cone shaped net with a length of 3.35 meters (m), a mouth area of 0.37 m$^2$, and a 505 $\mu$m NitexR mesh. The mesh size was altered prior to the 2014 season to 500 $\mu$m NitexR, when the original mesh size was no longer available and new nets were purchased (see 2014 changes below). These new nets were incorporated as old nets became unusable. The net is mounted on a fixed D-frame with skis and is connected to the frame by a canvas mouth. At the end of each tow, net contents are washed into a cod-end jar attached to the end of the net. A General Oceanics flowmeter is mounted across the net’s mouth to estimate the water volume filtered during each tow. Prior to 2015, all flowmeters were calibrated at UC Davis before the start of the season to determine its calibration factor required for water volume calculations. After 2015, the calibration flume at UC Davis became inoperable, and the meters were sent to General Oceanics for refurbishing before each field season and the factory calibration factor used. Since 2019, meters are inspected at the end of every field season and are replaced with new units if refurbishing is required to support the continued use of the factory calibration factor.
 
-**Tow:** A single 10 minute stepped oblique tow with the boat moving at 1 m/s is conducted at each of the 44 sampling stations. The amount of cable released is dependent on the water depth at the station. A gradual oblique tow is achieved following the tow schedule specific to the amount of cable released and the duration of the tow. Although most tows are 10 minutes in length, tow time can be reduced during periods of heavy samples. If the net is clogged during algal blooms, jellyfish blooms, or heavy debris events the tow time can be reduced to 5 or 2.5 minutes, an alternate tow schedule is followed, and the duration is recorded. If material is still overflowing from the cod-end jar in a 2.5 minute tow, the entire station is dropped. Re-tows can occur if a sample is compromised or the flowmeter reading is less than 10000 or greater than 30000 m in a 10 minute tow. All abnormal events are to be recorded in the "comments" section of the datasheet.
+**Tow:** A single 10 minute stepped oblique tow with the boat moving at 1 m/s is conducted at each of the sampling stations. The amount of cable released is dependent on the water depth at the station. A gradual oblique tow is achieved following the tow schedule specific to the amount of cable released and the duration of the tow. Although most tows are 10 minutes in length, tow time can be reduced in the event of a of a clogged net. Periods of heavy samples may result due to algal blooms, jellyfish blooms, or heavy debris events. The tow time can be reduced to 5 or 2.5 minutes, an alternate tow schedule is followed, and the duration is recorded. If material is still overflowing from the cod-end jar in a 2.5 minute tow, the entire station is dropped. Re-tows can occur if a sample is compromised or the flowmeter reading is less than 10000 or greater than 30000 in a 10 minute tow. All abnormal events are to be recorded in the "comments" section of the datasheet.
 
-**Environmental and water quality data:** Immediately prior to each tow, bottom and surface water samples are independently collected. From these water samples: 1) surface water temperature (°C) and surface and bottom EC ($\mu$S/cm, normalized at 25 °C) are recorded using a calibrated (before each season) and rinsed YSI Model 30; and 2) surface turbidity (NTU) is recorded using a calibrated (before each season) HACH 2100p turbidity meter (sample vials are cleaned before each sample). Secchi depth (m) is measured using Secchi discs mounted to rigid meter sticks to a maximum depth of two meters; values are measured in the shade without sunglasses on, off the side of the boat by the same person for the day for consistency. Water bottom depth (ft) is recorded using a depth finder on the boat. Tide data is recorded as the visually observed tidal stage by the crew during the tow as high slack, ebb, low slack, or flood.
+**Environmental and water quality data:** Immediately prior to each tow, surface and benthic water quality data are independently collected including: 1) surface water temperature (°C), surface turbidity (FNU), surface and bottom EC ($\mu$S/cm, normalized at 25 °C) are recorded using a calibrated and rinsed YSI ProDSS; and 2) surface turbidity (NTU) is recorded using a calibrated HACH 2100p turbidimeter. Secchi depth (cm) is measured using Secchi discs mounted to rigid meter sticks to a maximum depth of two meters; values are measured in the shade without sunglasses on, off the side of the boat by the same person for the day for consistency. Water bottom depth (ft) is recorded using a depth finder on the boat. Tide data is recorded as the visually observed tidal stage by the crew during the tow as high slack, ebb, low slack, or flood.
 
 ```{r table of equipment used to measure abiotic data}
 data.frame(Variable = c("Water temperature (surface)", 
@@ -181,7 +185,7 @@ data.frame(Variable = c("Water temperature (surface)",
                     paste0("\U00B5", "m/cm"),
                     "FNU", 
                     "NTU",
-                    "m", 
+                    "cm", 
                     "", 
                     "Feet", 
                     "")) %>% 
@@ -189,18 +193,20 @@ data.frame(Variable = c("Water temperature (surface)",
   kable_styling(latex_options = c("striped", "hold_position"))
 ```
 
-**Catch data:** At the end of every tow, the net is washed down so that all visible vegetation, fish, sand, and debris are washed into the cod-end jar. Large debris and adult fish ($\ge$ 50 mm) can be removed if positively identified. If salmonids were caught, fork lengths are measured, presence of the adipose fin noted, and the fish are immediately released gently and alive. All other larval and juvenile fish are kept in distinctively labeled sampling jars and preserved in 10% buffered and dyed formalin for later processing in the laboratory.
+**Catch data:** At the end of every tow, the net is washed down so that all visible vegetation, fish, sand, and debris are washed into the cod-end jar. Large debris and adult fish ($\ge$ 50 mm) can be removed if positively identified. If salmonids were caught, fork lengths are measured, presence or absence of the adipose fin noted, and the fish are immediately released gently and alive. All other larval and juvenile fish are kept in distinctively labeled sampling jars and preserved in 10% buffered and dyed formalin for later processing in the laboratory.
 
 ## Lab analysis, fish ID and QC
 
-In the lab, before the next survey if possible, fish are identified from each sample under a microscope. First, fish are separated from debris and other organisms during a process referred to as "sorting". Then, the entire sample undergo a quality control (QC) check to ensure that fish were not missed during sorting. Finally, fish undergo a first ID and count by an identifier, followed by a QC from a larval fish ID specialist to confirm all species identifications and counts. This QC process is dependent on the experience of the identifier doing the first ID. Fish identifiers will begin with all their identifications QC'ed and transition to having fewer and fewer samples QC’ed with experience, until the identifier is considered a larval fish ID specialist. Samples are randomly selected to undergo this QC process. Across all samples (QC required or not), all CESA and ESA fishes and any questionable fish IDs must undergo a second ID. All fish are identified to species or the lowest possible taxon. Since the inception of the survey, there have not been instances when of a species has been identified to a lower taxon or identified under a different name. Only the first 50 randomly selected individuals of each species from each tow are measured for lengths to the nearest millimeter, and the rest of the sample is simply enumerated. However, all Longfin Smelt and Delta Smelt are measured for lengths regardless of catch size.
+In the lab fish are identified from each sample under a microscope. First, fish are separated from debris and other organisms during a process referred to as "sorting". Then, the entire sample undergoes a quality control (QC) check to ensure that fish were not missed during sorting. Finally, fish undergo a first ID and count by an identifier, followed by a QC from a larval fish ID specialist to confirm all species identifications and counts. This QC process is dependent on the experience of the first identifier doing the first ID. Fish identifiers will begin with all their identifications QC'ed and transition to having fewer and fewer samples QC’ed with experience, until the identifier is considered a larval fish ID specialist. Once the larval fish ID specialist level is acquired, samples are randomly selected to undergo the QC process. Across all samples (QC required or not), all CESA and ESA fishes and any questionable fish IDs must undergo a second ID. All fish are identified to species or the lowest possible taxon. Only the first 50 randomly selected individuals of each species from each tow are measured for lengths to the nearest millimeter, and the rest of the sample is simply enumerated. However, all  Delta Smelt (*Hypomesus transpacificus*) are measured for lengths regardless of catch size. All Longfin Smelt are measured unless there is an excessive amount (>200) then only 100 are measured and the rest are plus counted. 
 
 ## Relative density analysis
 
 The total number of fish per volume water sampled (standardized to 1000 $m^3$) is calculated using the following two equations:
 
 <center>
+
 $V_{t} = A * K * D_{t}$
+
 </center>
 
 *Where:*
@@ -227,7 +233,7 @@ $V_{t}$ = volume of water filtered through the net $m^{3}$ per tow $t$
 
 ## Data management
 
-All field data is entered into a digital Access database using forms between survey events during the season. Immediately after entry, data undergoes two rounds of ‘line-by-line’ checks, wherein all data fields are checked against the original datasheets for fidelity. At the end of the survey field season once all the fish samples have been processed in the laboratory and data entry is complete, all data is ‘finalized’ to be as accurate as possible for public use. The first step in this process is to conduct two additional line-by-lines. Next, a project lead will run a series of coded queries to analyze the underlying data distributions to detect potential outliers in the environmental data. Not all data is changed if it is flagged as an outlier (generally beyond 2 standard deviations of the mean). In most cases, outliers are real data. These queries simply alert the project lead of potential erroneous data, and care is taken to edit only data that truly needs to be edited, e.g., data that was entered incorrectly or caused by equipment failures. All resulting data edits are documented in a separate log file.
+All data is entered into a digital Microsoft Access database once the fish id has been finalized. Immediately after entry, data undergoes two rounds of ‘line-by-line’ checks, wherein all data fields are checked against the original datasheets for fidelity. At the end of the SLS survey field season, once all the fish samples have been processed in the laboratory and data entry is complete, all data is ‘finalized’ to be as accurate as possible for public use. The first step in this process is to conduct two additional final line-by-lines checks. Next, a project lead will run a series of coded queries to analyze the underlying data distributions to detect potential outliers in the environmental data. Not all data is changed if it is flagged as an outlier (generally beyond 2 standard deviations of the mean). In most cases, outliers are real data. These queries simply alert the project lead of potential erroneous data, and care is taken to edit only data that truly needs to be edited, e.g., data that was entered incorrectly or caused by equipment failures. All resulting data edits are documented in a separate log file.
 
 ## The provided data tables
 
@@ -273,7 +279,7 @@ pos <- df %>%
 
 df %>%
   rename("Water Year" = waterYear) %>% 
-  kbl(booktabs = T, longtable = T, caption = "History of substantial changes to the SLS Survey since its inception. Rows are highlighted per unique water year.") %>%
+  kbl(booktabs = T, longtable = T, caption = "History of substantial changes to the SLS since its inception.") %>%
   row_spec(pos, background = "#EEEEEE") %>%
   column_spec(2, width = "40em")
 ```
@@ -366,5 +372,5 @@ SLS %>%
   slice(1) %>% 
   transmute(CommonName, Taxa, DateFirstID = Date) %>% 
   arrange(CommonName, Taxa) %>% 
-  kbl(booktabs = T, longtable = T, caption = "The SLS Survey identifies all captured fish, jellyfish, and shrimp species. The date associated with the first identification of each species is provided. There is not been a taxa that is not identified by the survey if captured, although not all taxa are identified to the species level.")
+  kbl(booktabs = T, longtable = T, caption = "The SLS Survey identifies all captured fish. The date associated with the first identification of each species is provided. There has not been a taxa that is not identified by the survey if captured, although not all taxa are identified to the species level.")
 ```

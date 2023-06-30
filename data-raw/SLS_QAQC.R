@@ -517,10 +517,10 @@ outliers$Turbidity <- data$WaterInfo %>%
   mutate(SeasonYear = year(Date) + (month(Date) > 11),
          # This is part 1 of the query
          meanTurbidity = mean(FNU, na.rm = T),
-         sd2down = meanTurbidity - 2 * sd(FNU, na.rm = T),
-         sd2up = meanTurbidity + 2 * sd(FNU, na.rm = T),
+         sd2down = meanTurbidity - 2 * sd(NTU, na.rm = T),
+         sd2up = meanTurbidity + 2 * sd(NTU, na.rm = T),
          # This is part 2 of the query
-         Outlier = ifelse((FNU < sd2down | FNU > sd2up), T, F),
+         Outlier = ifelse((NTU < sd2down | NTU > sd2up), T, F),
          NAFlag = ifelse(is.na(FNU), T, F)) %>% 
   ungroup() %>% 
   arrange(Date) %>% 

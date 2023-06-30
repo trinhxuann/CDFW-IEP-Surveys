@@ -120,7 +120,7 @@ if (length(list.files(path = filePath, pattern = ".rds$")) > 0) {
 
 # Manipulating the data tables --------------------------------------------
 
-waterInfo <- SLSTables$WaterInfo %>%
+WaterInfo <- SLSTables$WaterInfo %>%
   dplyr::mutate(
     # Converting secchi from cm to m
     Secchi = Secchi/100,
@@ -129,10 +129,10 @@ waterInfo <- SLSTables$WaterInfo %>%
     Sal_surf = wql::ec2pss(TopEC/1000, t = 25),
     Sal_bot = wql::ec2pss(BottomEC/1000, t = 25),
     # This is to take care of how the floats are read between Access and readr methods...
-    Temp_surf = round(Temp, 2)) %>% 
+    Temp_surf = round(TopTemp, 2)) %>% 
   dplyr::rename(Notes_env = Comments)
 
-towInfo <- SLSTables$TowInfo %>%
+TowInfo <- SLSTables$TowInfo %>%
   # manipulation of time should not be required if pulling from the RDS file, 
   # but won't change so leaving to cover when you are using the csv files
   dplyr::mutate(Time = strptime(Time, format = "%Y-%m-%d %H:%M:%S",
@@ -166,7 +166,7 @@ towInfo <- SLSTables$TowInfo %>%
                 # Calculating tow volume for the fish net, 0.37 as the area of the mout of the net (per Access + SLS SOP document)
                 Tow_volume = NetMeterCheck * kFactor * 0.37)
 
-stationLookup <- SLSTables$Station_Lookup %>% 
+StationLookup <- SLSTables$Station_Lookup %>% 
   # Removing 2 rows of trailing white space
   dplyr::mutate(across(c(Lat, Long), trimws)) %>% 
   tidyr::separate(Lat, into = c("LatD", "LatM", "LatS"), sep = " ") %>%
@@ -177,7 +177,7 @@ stationLookup <- SLSTables$Station_Lookup %>%
 
 catch <- SLSTables$Catch 
 
-lengths <- SLSTables$Lengths %>%
+Lengths <- SLSTables$Lengths %>%
   # Calculating total number of fish measured (across all lengths) and # of fish measured
   # per Date, Station, Tow, and FishCode
   # This is to calculate plus counts later in dfFin
@@ -235,24 +235,24 @@ joinCheckSteps <- list()
 # Now begin joining
 
 # waterInfo and towInfo together
-waterTowJoin <- waterInfo %>% 
-  dplyr::full_join(towInfo,
+WaterTowJoin <- WaterInfo %>% 
+  dplyr::full_join(TowInfo,
                    c("Date", "Station"))
 
-joinCheckSteps$waterTowWater <- compareDF(waterInfo, waterTowJoin)
-joinCheckSteps$waterTowTow <- compareDF(towInfo, waterTowJoin)
+joinCheckSteps$WaterTowWater <- compareDF(WaterInfo, WaterTowJoin)
+joinCheckSteps$WaterTowTow <- compareDF(TowInfo, WaterTowJoin)
 # Ok
 
 # Now joining catch to waterInfo + towInfo joined table
-waterTowCatchJoin <- waterTowJoin %>% 
+WaterTowCatchJoin <- WaterTowJoin %>% 
   dplyr::full_join(catch,
                    by = c("Date", "Station", "Tow"))
 
-joinCheckSteps$waterTowCatchWater <- compareDF(waterInfo, waterTowCatchJoin)
-joinCheckSteps$waterTowCatchTow <- compareDF(towInfo, waterTowCatchJoin)
-compareDF(catch, waterTowCatchJoin)
+joinCheckSteps$waterTowCatchWater <- compareDF(WaterInfo, WaterTowCatchJoin)
+joinCheckSteps$waterTowCatchTow <- compareDF(TowInfo, WaterTowCatchJoin)
+compareDF(catch, WaterTowCatchJoin)
 # Check catch (+X NAs)
-joinCheckSteps$waterTowCatchCatch <- compareDF(catch, waterTowCatchJoin %>% 
+joinCheckSteps$WaterTowCatchCatch <- compareDF(catch, WaterTowCatchJoin %>% 
                                                  dplyr::filter(!is.na(Catch)))
 # NOTE HERE; there are instances when tows do not catch any
 # fish at all and these instances are NOT recorded in the catch
@@ -262,19 +262,19 @@ joinCheckSteps$waterTowCatchCatch <- compareDF(catch, waterTowCatchJoin %>%
 # in the waterInfo table. Use of full_join is more appropriate here
 
 # Now join to length table
-waterTowCatchLengthJoin <- waterTowCatchJoin %>% 
+WaterTowCatchLengthJoin <- WaterTowCatchJoin %>% 
   dplyr::full_join(lengths,
                    by = c("Date", "Station", "Tow", "FishCode"))
 
-joinCheckSteps$waterTowCatchLengthWater <- compareDF(waterInfo, waterTowCatchLengthJoin)
-joinCheckSteps$waterTowCatchLengthTow <- compareDF(towInfo, waterTowCatchLengthJoin)
-compareDF(catch, waterTowCatchLengthJoin)
-compareDF(lengths, waterTowCatchLengthJoin)
+joinCheckSteps$WaterTowCatchLengthWater <- compareDF(WaterInfo, WaterTowCatchLengthJoin)
+joinCheckSteps$WaterTowCatchLengthTow <- compareDF(TowInfo, WaterTowCatchLengthJoin)
+compareDF(catch, WaterTowCatchLengthJoin)
+compareDF(lengths, WaterTowCatchLengthJoin)
 # Similar problem from catch propagated
-joinCheckSteps$waterTowCatchLengthCatch <- compareDF(catch, waterTowCatchLengthJoin %>% 
+joinCheckSteps$WaterTowCatchLengthCatch <- compareDF(catch, WaterTowCatchLengthJoin %>% 
                                                        dplyr::filter(!is.na(Catch)))
 # Check lengths (+y NAs, more values than catch if catch has a value but lengths were not recorded)
-joinCheckSteps$waterTowCatchLengthLengths <- compareDF(lengths, waterTowCatchLengthJoin %>% 
+joinCheckSteps$WaterTowCatchLengthLengths <- compareDF(lengths, WaterTowCatchLengthJoin %>% 
                                                          dplyr::filter(!is.na(Length)))
 # The +1 error that is propagated via length table happened on 
 # This occurred on 2009-02-18, station 508 during which there is 1 entry of
@@ -282,7 +282,7 @@ joinCheckSteps$waterTowCatchLengthLengths <- compareDF(lengths, waterTowCatchLen
 
 # Now the last joining steps, to species code and station #
 # This step should never add or delete rows given that it's a left_join only
-finJoin <- waterTowCatchLengthJoin %>% 
+finJoin <- WaterTowCatchLengthJoin %>% 
   dplyr::left_join(LTMRdata::Species %>%
                      dplyr::select(TMM_Code,
                                    Taxa) %>%
@@ -332,10 +332,10 @@ SLS <- finJoin %>%
 
 # One last step to QAQC; can we get back to the base tables from this joined table?
 # waterInfo
-joinCheckSteps$waterInfoFin <- compareDF(SLS %>% 
-                                           dplyr::select(names(waterInfo)) %>% 
+joinCheckSteps$WaterInfoFin <- compareDF(SLS %>% 
+                                           dplyr::select(names(WaterInfo)) %>% 
                                            dplyr::distinct(),
-                                         waterInfo, distinctTarget = F)
+                                         WaterInfo, distinctTarget = F)
 # towInfo
 joinCheckSteps$towInfoFin <- compareDF(SLS %>% 
                                          # Notes_tow column here is slightly modified from original
@@ -374,7 +374,7 @@ if (any(!unlist(joinCheckSteps))) {
     # Removing CBMeterSerial, CBMeterStart, CBMeterEnd, CBMeterCheck as CB not ran on the SLS
     dplyr::select(Source, Station, Latitude, Longitude,
                   Date, Datetime, Survey, Depth, SampleID, Method,
-                  Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, Turbidity, Tow_volume,
+                  Tide, Sal_surf, Sal_bot, Temp_surf, Secchi, NTU, FNU, Tow_volume,
                   Cable_length = CableOut, Tow_duration = Duration,
                   Taxa, Length, Count, Length_NA_flag,
                   Notes_tow, Notes_flowmeter = Notes) %>% 
@@ -417,3 +417,4 @@ if (any(!unlist(joinCheckSteps))) {
 
 # Change the object if you want the fully zero-filled dataset.
 write.csv(SLS, file = file.path("data-raw", "SLS", "SLS.csv"), row.names = F)
+

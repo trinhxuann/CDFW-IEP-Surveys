@@ -166,14 +166,14 @@ readSLSAccess <- function(file = Args[1],
     mutate(Date = as.Date(Date))
   
   # # Fish code table
-  # fishCodePosition <- which(sapply(SLSTables, 
-  #                                 function(tables) any(grepl("Common.Name", 
-  #                                                            x = names(tables), 
-  #                                                            ignore.case = T))))
-  # 
-  # SLSTables[[fishCodePosition]] <- SLSTables[[fishCodePosition]] %>% 
-  #   transmute(CommonName = Common.Name,
-  #             FishCode = Fish.Code)
+      fishCodePosition <- which(sapply(SLSTables,
+                                      function(tables) any(grepl("Common.Name",
+                                                                 x = names(tables),
+                                                                 ignore.case = T))))
+
+      SLSTables[[fishCodePosition]] <- SLSTables[[fishCodePosition]] %>%
+        transmute(CommonName = Common.Name,
+                  FishCode = Fish.Code)
  
    # Length table
   lengthPosition <- which(sapply(SLSTables, 
@@ -219,8 +219,8 @@ readSLSAccess <- function(file = Args[1],
   SLSTables[[waterPosition]] <- SLSTables[[waterPosition]] %>% 
     transmute(Survey, 
               Date = as.Date(Date),
-              Station, TopTemp, TopEC, BottomEC, Secchi, FNU,
-           StartLat, StartLong, Comments)
+              Station, TopTemp, TopEC, BottomEC, Secchi, FNU, NTU,
+           StartLat, StartLong, EndLat, EndLong, Comments)
   
   # Meter Correction
   # Columns names are ok; only need to change calibrationDate to as.Date
